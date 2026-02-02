@@ -1,3 +1,5 @@
+#Author: Antoine Collas 2025
+
 import argparse
 import pickle
 from pathlib import Path
