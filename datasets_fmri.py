@@ -1,4 +1,6 @@
-#Author: Antoine Collas 2025
+'''
+This script is from fmrida by Antoine Collas.
+'''
 
 import argparse
 import pickle
@@ -29,20 +31,26 @@ from sklearn.utils import Bunch
 
 from joblib import Parallel, delayed
 
-
 import sys
 from pathlib import Path
 root_dir = Path(__file__).resolve().parent.parent
 sys.path.append(str(root_dir))
 
-from fmrida.constants import AVAILABLE_ATLASES, AVAILABLE_DATASETS
+AVAILABLE_ATLASES  = ["msdl_39", "schaefer_100"]
+
+AVAILABLE_DATASETS = [
+    "1000brains", 
+    "abide",
+    "adni",
+    "adnidod",
+    "camcan",
+    "cobre",
+    "oasis3",
+]
 
 
-#PATH_CACHE = Path("../dataset/dataset")
-#PATH_RAW_DATA = Path("../../dataset/dataset/raw_data").expanduser()
 PATH_RAW_DATA              = Path("../../dataset/dataset/raw_data")
 PATH_TS_1000BRAINS         = Path("../1000brains") / "Project_Andrea_Brovelli"
-#PATH_RAW_DATA_ADNI_ADNIDOD = Path("~/store3/work/acollas/fmri_preprocessing/").expanduser()
 PATH_RAW_DATA_ADNI_ADNIDOD = Path("../../dataset/dataset/raw_data").expanduser()
 PATH_RAW_DATA_OASIS3       = Path("~/store3/work/acollas/fmri_preprocessing_oasis3/").expanduser()
 PATH_RAW_DATA_HCP          = Path("../../dataset/dataset/raw_data").expanduser()
