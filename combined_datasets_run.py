@@ -1,3 +1,14 @@
+"""
+Section 3.2:
+
+Run (GroupKFold and LODO) age regression on combined seven rs-fMRI datasets using dummy, TS ridge, and SPDNet models.
+
+This script loads dataset-specific time series, estimates covariance/FC matrices, optionally harmonizes features across sites, 
+and trains/evaluates models. 
+
+Results are saved as CSV files with MAE, R2 metrics for each fold and average.
+"""
+
 import argparse
 import os
 import time
@@ -185,9 +196,7 @@ def cov_est(ts, normalize=True, n_jobs=-1, eps=1e-5):
 
 
 def group_train_val_split(train_idx, groups, val_size=0.2, seed=42):
-    """
-    Split train_idx into train_sub_idx and val_sub_idx using group-aware split.
-    """
+
     gss = GroupShuffleSplit(n_splits=1, test_size=val_size, random_state=seed)
     sub_train, sub_val = next(gss.split(train_idx, groups=groups[train_idx]))
     train_sub_idx = train_idx[sub_train]
@@ -378,7 +387,7 @@ def train_one_fold(
             batch_y = batch_y.to(device, dtype=torch.float32, non_blocking=True)
 
             optimizer.zero_grad()
-            pred = model(batch_x).squeeze(-1)  # (B,)
+            pred = model(batch_x).squeeze(-1)  
             loss = criterion(pred, batch_y)
             loss.backward()
             if args.clip_grad > 0:
@@ -560,12 +569,12 @@ def run_merged_age_benchmarks(
         y_tr = y[train_idx]
         y_te = y[test_idx]
 
-        ts = TangentSpace(metric=ts_metric, tsupdate=False)
+        ts   = TangentSpace(metric=ts_metric, tsupdate=False)
         Z_tr = ts.fit_transform(X_tr)
         Z_te = ts.transform(X_te)
 
         cov_train = np.stack([dataset_ids[train_idx], y_tr], axis=1)
-        cov_test = np.stack([dataset_ids[test_idx], y_te], axis=1)
+        cov_test  = np.stack([dataset_ids[test_idx], y_te], axis=1)
 
         Z_tr_h, Z_te_h = _harmonize_ts_features(
             Z_tr, Z_te, cov_train, cov_test, apply_harm_to_test=apply_harm_to_test
