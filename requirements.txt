@@ -1,0 +1,24 @@
+# Python 3.11 validation environment.
+# These are pinned direct dependencies used by the benchmark smoke tests.
+
+spd-learn==0.1.0
+
+numpy==2.4.5
+pandas==3.0.3
+scikit-learn==1.8.0
+scipy==1.17.1
+joblib==1.5.3
+torch==2.12.0
+pyriemann==0.11
+
+neuroHarmonize==2.4.5
+statsmodels==0.14.6
+neuroCombat==0.2.12
+
+nilearn==0.13.1
+nibabel==5.4.2
+matplotlib==3.10.9
+seaborn==0.13.2
+tabulate==0.10.0
+
+pytest==9.0.3

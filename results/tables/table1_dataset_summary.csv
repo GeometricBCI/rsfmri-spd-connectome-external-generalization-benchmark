@@ -1,0 +1,7 @@
+dataset,n_subjects,n_scans,n_sites,site_column,sex_counts_json,n_male_scans,n_female_scans,n_missing_sex_scans,multiple_scans_per_subject,n_longitudinal_subjects,mean_scans_per_subject,age_mean,age_std,age_min,age_q1,age_median,age_q3,age_max
+abide,843,843,19,Site,"{""F"": 144, ""M"": 699}",699,144,0,False,0,1.0,17.12581470937129,7.617954628418164,6.47,12.085,14.86,20.0,58.0
+adni,936,1997,unavailable,unavailable_from_processed_table,"{""F"": 1070, ""M"": 927}",927,1070,0,True,472,2.1335470085470085,73.93590385578368,7.591531127780894,51.0,69.0,74.0,79.0,104.0
+adnidod,134,190,17,Site,"{""F"": 3, ""M"": 187}",187,3,0,True,45,1.4179104477611941,70.53684210526316,4.809662481463286,62.0,68.0,69.0,72.0,87.0
+camcan,652,652,unavailable,unavailable_from_processed_table,"{""F"": 330, ""M"": 322}",322,330,0,False,0,1.0,54.36349693251534,18.532298584874667,18.0,39.0,55.0,70.0,88.0
+cobre,143,143,unavailable,unavailable_from_processed_table,"{""F"": 37, ""M"": 106}",106,37,0,False,0,1.0,37.18181818181818,12.739255098726874,18.0,26.0,35.0,48.0,65.0
+oasis3,1035,1792,unavailable,unavailable_from_processed_table,"{""F"": 1006, ""M"": 786}",786,1006,0,True,441,1.731400966183575,70.91127232142857,8.932783230233511,42.7,65.6,71.2,76.8,97.1
