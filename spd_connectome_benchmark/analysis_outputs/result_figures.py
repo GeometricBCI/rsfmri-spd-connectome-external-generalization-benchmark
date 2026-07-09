@@ -82,7 +82,7 @@ def _build_single_dataset_plots():
         palette=MODEL_PALETTE,
         title="",
         save_dir=RESULT_FIGURES_DIR,
-        save_name="figure3_within_dataset_negmae.png",
+        save_name="figure3_within_dataset_negmae.pdf",
         figsize=(11, 4),
         show_points=True,
         point_size=2.5,
@@ -99,7 +99,7 @@ def _build_single_dataset_plots():
         palette=MODEL_PALETTE,
         title="",
         save_dir=RESULT_FIGURES_DIR,
-        save_name="figure3_within_dataset_r2.png",
+        save_name="figure3_within_dataset_r2.pdf",
         figsize=(11, 4),
         show_points=True,
         point_size=2.5,
@@ -191,27 +191,8 @@ def _dummy_metric_summary(experiment: str, metric: str, negate: bool = False) ->
     )
     values = pd.to_numeric(df.get("Value", pd.Series(dtype=float)), errors="coerce").dropna()
     if values.empty:
-        return "Dummy: n/a"
-    return f"Dummy mean={values.mean():.2f}, var={values.var(ddof=0):.2f}"
-
-def _build_all_age_plots_pooled(tag: str = "pooled"):
-    plots = [
-        _all_age_metric_plot("GKF5", "MAE", True, "GroupKFold (NegMAE)", "Negative MAE (↑)", False),
-        _all_age_metric_plot("LODO", "MAE", True, "LODO (NegMAE)", "Negative MAE (↑)", False),
-        _all_age_metric_plot("GKF5", "R2", False, "GroupKFold (R²)", "R² (↑)", True),
-        _all_age_metric_plot("LODO", "R2", False, "LODO (R²)", "R² (↑)", True),
-    ]
-    for plot in plots:
-        plot.update({"point_size": 3.5, "box_width": 0.8, "jitter": 0.10, "hue_offset_factor": 1.0})
-
-    plot_all_age_box_grid(
-        plots=plots,
-        title="",
-        save_dir=RESULT_FIGURES_DIR,
-        save_name=f"benchmark_ALL_Age_grid_{tag}.png",
-        figsize=(12, 5.5),
-        dpi=300,
-    )
+        return "Dummy: undefined"
+    return f"Dummy mean={values.mean():.2f}, std={values.std(ddof=0):.2f}"
 
 def _all_age_metric_plot(experiment, metric, negate, title, ylabel, zero_baseline):
     return {
@@ -228,51 +209,6 @@ def _all_age_metric_plot(experiment, metric, negate, title, ylabel, zero_baselin
         "palette": ALL_COMBINED_PALETTE,
     }
 
-def _build_all_age_plots_pooled_core_metrics(tag: str = "pooled_core_metrics"):
-    metric_specs = [
-        ("GKF5", "MAE", True, "GroupKFold (NegMAE)", "Negative MAE (↑)", False),
-        ("GKF5", "R2", False, "GroupKFold (R²)", "R² (↑)", True),
-        ("GKF5", "Pearson_r", False, "GroupKFold (Pearson r)", "Pearson r (↑)", True),
-        ("LODO", "MAE", True, "LODO (NegMAE)", "Negative MAE (↑)", False),
-        ("LODO", "R2", False, "LODO (R²)", "R² (↑)", True),
-        ("LODO", "Pearson_r", False, "LODO (Pearson r)", "Pearson r (↑)", True),
-    ]
-    plots = [
-        _all_age_metric_plot(experiment, metric, negate, plot_title, ylabel, zero_baseline)
-        for experiment, metric, negate, plot_title, ylabel, zero_baseline in metric_specs
-    ]
-
-    plot_all_age_box_grid_wrapped(
-        plots=plots,
-        title="",
-        save_dir=RESULT_FIGURES_DIR,
-        save_name=f"{tag}.png",
-        ncols=3,
-        figsize=(11.5, 9.2),
-        dpi=300,
-        legend_ncol=6,
-    )
-
-def _build_all_age_plots_pooled_bias_metrics(tag: str = "pooled_bias_metrics"):
-    metric_specs = [
-        ("LODO", "Spearman_rho", False, "LODO (Spearman rho)", "Spearman rho (↑)", True),
-        ("LODO", "age_bias_slope", False, "LODO (age-bias slope)", "age-bias slope", True),
-    ]
-    plots = [
-        _all_age_metric_plot(experiment, metric, negate, plot_title, ylabel, zero_baseline)
-        for experiment, metric, negate, plot_title, ylabel, zero_baseline in metric_specs
-    ]
-
-    plot_all_age_box_grid_wrapped(
-        plots=plots,
-        title="",
-        save_dir=RESULT_FIGURES_DIR,
-        save_name=f"benchmark_ALL_Age_grid_{tag}.png",
-        ncols=2,
-        figsize=(8.5, 4.5),
-        dpi=300,
-    )
-
 def _build_all_age_plots_pooled_all_metrics(tag: str = "pooled_all_metrics"):
     metric_specs = [
         ("GKF5", "MAE", True, "GroupKFold (NegMAE)", "Negative MAE (↑)", False),
@@ -280,7 +216,6 @@ def _build_all_age_plots_pooled_all_metrics(tag: str = "pooled_all_metrics"):
         ("GKF5", "R2", False, "GroupKFold (R²)", "R² (↑)", True),
         ("LODO", "R2", False, "LODO (R²)", "R² (↑)", True),
         ("LODO", "Spearman_rho", False, "LODO (Spearman rho)", "Spearman rho (↑)", True),
-        ("LODO", "age_bias_slope", False, "LODO (age-bias slope)", "age-bias slope", True),
     ]
     plots = [
         _all_age_metric_plot(experiment, metric, negate, plot_title, ylabel, zero_baseline)
@@ -291,9 +226,9 @@ def _build_all_age_plots_pooled_all_metrics(tag: str = "pooled_all_metrics"):
         plots=plots,
         title="",
         save_dir=RESULT_FIGURES_DIR,
-        save_name=f"benchmark_ALL_Age_grid_{tag}.png",
-        ncols=3,
-        figsize=(11.5, 9.2),
+        save_name=f"{tag}.pdf",
+        ncols=5,
+        figsize=(16.0, 4.2),
         dpi=300,
         legend_ncol=6,
     )
@@ -337,7 +272,6 @@ def _build_all_age_plots_bimaps_0423(tag: str = "bimaps_0423"):
     df_gkf5_r2 = _build_bimap_variant_points_df("R2", experiment="GKF5")
     df_lodo_r2 = _build_bimap_variant_points_df("R2", experiment="LODO")
     df_lodo_spearman = _build_bimap_variant_points_df("Spearman_rho", experiment="LODO")
-    df_lodo_age_bias = _build_bimap_variant_points_df("age_bias_slope", experiment="LODO")
 
     model_order = [
         "quarterdim (BiMap+ReEig)(original)",
@@ -419,24 +353,12 @@ def _build_all_age_plots_bimaps_0423(tag: str = "bimaps_0423"):
                 "order": model_order,
                 "palette": palette,
             },
-            {
-                "df": df_lodo_age_bias,
-                "title": "LODO (Age-Bias Slope)",
-                "ylabel": "Age-Bias Slope",
-                "point_size": 3.5,
-                "zero_baseline": True,
-                "box_width": 0.78,
-                "jitter": 0.10,
-                "hue_offset_factor": 1.0,
-                "order": model_order,
-                "palette": palette,
-            },
         ],
         title="",
         save_dir=RESULT_FIGURES_DIR,
-        save_name=f"{tag}.png",
-        ncols=3,
-        figsize=(16.5, 14.0),
+        save_name=f"{tag}.pdf",
+        ncols=5,
+        figsize=(16.0, 4.2),
         dpi=300,
         legend_title="SPDNet",
         legend_ncol=8,
@@ -444,7 +366,7 @@ def _build_all_age_plots_bimaps_0423(tag: str = "bimaps_0423"):
 
 
 def build_all_result_figures() -> None:
-    """Generate all benchmark result figures from saved CSV outputs."""
+    """Generate only the new benchmark result figures Figure 4 and Figure 5."""
     _build_single_dataset_plots()
-    _build_all_age_plots_pooled_all_metrics(tag="figure4_pooled_benchmark")
-    _build_all_age_plots_bimaps_0423(tag="figure5_spdnet_ablation")
+    _build_all_age_plots_pooled_all_metrics(tag="figure4_pooled_benchmark_5panel_row_narrow_tall")
+    _build_all_age_plots_bimaps_0423(tag="figure5_spdnet_ablation_5panel_row")

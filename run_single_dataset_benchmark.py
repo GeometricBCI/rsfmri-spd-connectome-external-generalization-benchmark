@@ -334,8 +334,7 @@ def run_corrvec_ridge_age_regression(
 
         print(f"\n===== {dataset_name} | {alg_name} Fold {kf_iter}/{len(splits)} =====")
         print("Vectorizing correlation matrices ...")
-        # Paper Methods 2.5.3: CorrVec uses off-diagonal upper-triangle
-        # correlations and no sqrt(2) tangent weighting.
+        # CorrVec uses the isometric off-diagonal upper-triangle convention.
         Z_tr = vectorize_correlation_matrices(X_tr, include_diagonal=False)
         Z_te = vectorize_correlation_matrices(X_te, include_diagonal=False)
 

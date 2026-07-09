@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from spd_connectome_benchmark.config import DEFAULT_FIGURES_DIR
 from spd_connectome_benchmark.analysis_outputs.plot_style import (
     align_strip_points_to_box_centers,
     compress_hue_offsets,
@@ -23,8 +24,8 @@ def plot_all_age_avg_bar(
     title="ALL Age Regression",
     subtitle=None,
     ylabel="Metric (↑)",
-    save_dir="results/figures",
-    save_name="benchmark_ALL_Age.png",
+    save_dir=DEFAULT_FIGURES_DIR,
+    save_name="benchmark_ALL_Age.pdf",
     figsize=(5.5, 4),
     dpi=300,
 ):
@@ -96,8 +97,8 @@ def plot_all_age_box(
     title="ALL Age Regression",
     subtitle=None,
     ylabel="Metric (↑)",
-    save_dir="results/figures",
-    save_name="benchmark_ALL_Age.png",
+    save_dir=DEFAULT_FIGURES_DIR,
+    save_name="benchmark_ALL_Age.pdf",
     figsize=(5.5, 4),
     dpi=300,
     show_points=True,
@@ -228,8 +229,8 @@ def plot_all_age_box(
 def plot_all_age_box_grid(
     plots,
     title="ALL Age Regression",
-    save_dir="results/figures",
-    save_name="figure4_pooled_benchmark.png",
+    save_dir=DEFAULT_FIGURES_DIR,
+    save_name="figure4_pooled_benchmark_5panel_row_narrow_tall.pdf",
     figsize=(16, 4),
     dpi=300,
     legend_title="Regressor",
@@ -298,8 +299,8 @@ def plot_all_age_box_grid(
 def plot_all_age_box_grid_wrapped(
     plots,
     title="ALL Age Regression",
-    save_dir="results/figures",
-    save_name="figure4_pooled_benchmark.png",
+    save_dir=DEFAULT_FIGURES_DIR,
+    save_name="figure4_pooled_benchmark_5panel_row_narrow_tall.pdf",
     ncols=3,
     figsize=(15, 12),
     dpi=300,

@@ -116,6 +116,7 @@ def _run_dataset_shift(args: argparse.Namespace) -> None:
     dataset_shift.main(
         pkl_dir=args.pkl_dir,
         table_dir=args.table_dir,
+        figure_dir=args.result_figure_dir,
     )
 
 

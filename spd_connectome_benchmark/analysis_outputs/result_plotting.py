@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
+from spd_connectome_benchmark.config import DEFAULT_FIGURES_DIR
 from spd_connectome_benchmark.analysis_outputs.result_io import (
     build_long_df,
     build_long_df_metric,
@@ -31,8 +32,8 @@ def plot_paper_style_box(
     order=("Dummy", "Ridge", "SPDNet"),
     palette=None,
     title="Age Regression Benchmark",
-    save_dir="results/figures",
-    save_name="benchmark_Age_paper.png",
+    save_dir=DEFAULT_FIGURES_DIR,
+    save_name="benchmark_Age_paper.pdf",
     figsize=(10, 3.6),       
     dpi=300,
     legend_pos="right",      # "right" or "top" or "none"
@@ -152,8 +153,8 @@ def plot_paper_style_box_row(
     order=("Dummy", "Ridge", "SPDNet"),
     palette=None,
     title="Age Regression Benchmark",
-    save_dir="results/figures",
-    save_name="figure3_within_dataset_negmae.png",
+    save_dir=DEFAULT_FIGURES_DIR,
+    save_name="figure3_within_dataset_negmae.pdf",
     figsize=(18, 4),
     dpi=300,
     show_points=True,
@@ -266,8 +267,8 @@ def plot_paper_style_box_row_metric(
     order=("Dummy", "Ridge", "SPDNet"),
     palette=None,
     title="Age Regression Benchmark",
-    save_dir="results/figures",
-    save_name="benchmark_metric.png",
+    save_dir=DEFAULT_FIGURES_DIR,
+    save_name="benchmark_metric.pdf",
     figsize=(18, 4),
     dpi=300,
     show_points=True,
@@ -421,8 +422,8 @@ def plot_paper_style_box_two_rows(
     palette=None,
     title_top="",
     title_bottom="",
-    save_dir="results/figures",
-    save_name="figure3_within_dataset_negmae_r2.png",
+    save_dir=DEFAULT_FIGURES_DIR,
+    save_name="figure3_within_dataset_negmae_r2.pdf",
     figsize=(10, 7),
     dpi=300,
     show_points=True,

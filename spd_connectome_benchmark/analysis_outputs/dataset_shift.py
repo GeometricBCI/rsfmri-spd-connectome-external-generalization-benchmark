@@ -12,7 +12,12 @@ import seaborn as sns
 from matplotlib.patches import Patch
 from matplotlib.patches import Rectangle
 
-from spd_connectome_benchmark.config import DEFAULT_ATLAS_DIR, DEFAULT_TABLES_DIR, PAPER_DATASETS
+from spd_connectome_benchmark.config import (
+    DEFAULT_ATLAS_DIR,
+    DEFAULT_FIGURES_DIR,
+    DEFAULT_TABLES_DIR,
+    PAPER_DATASETS,
+)
 
 
 # Paper Figure 2 / §2.1: six datasets in ascending scan-count order.
@@ -41,6 +46,7 @@ RIDGE_BASE_LIFT = 0.10
 RIDGE_LABEL_LIFT = 0.20
 PKL_DIR = DEFAULT_ATLAS_DIR
 TABLE_DIR = DEFAULT_TABLES_DIR
+FIGURE_DIR = DEFAULT_FIGURES_DIR
 
 
 def _rgba(color: str, alpha: float) -> tuple:
@@ -377,7 +383,7 @@ def _plot_age_distributions(age_df: pd.DataFrame) -> None:
     _draw_age_ridgelines(ax_top, age_df, ordered_datasets)
     _draw_age_box_strip(ax_bottom, age_df, ordered_datasets, ordered_labels)
 
-    fig.savefig(TABLE_DIR / "dataset_shift_age_distributions.png", bbox_inches="tight")
+    fig.savefig(TABLE_DIR / "dataset_shift_age_distributions.pdf", bbox_inches="tight")
     plt.close(fig)
 
 
@@ -505,7 +511,7 @@ def _plot_dataset_composition(_meta: dict) -> None:
     _draw_composition_sex_balance(ax_sex, dataset_summary)
     _draw_composition_diagnosis(ax_diag, diagnosis_summary)
 
-    fig.savefig(TABLE_DIR / "dataset_shift_composition.png", bbox_inches="tight")
+    fig.savefig(TABLE_DIR / "dataset_shift_composition.pdf", bbox_inches="tight")
     plt.close(fig)
 
 
@@ -548,7 +554,7 @@ def _plot_age_mean_gap_matrix(age_df: pd.DataFrame) -> None:
         color="#5E564C",
     )
 
-    fig.savefig(TABLE_DIR / "dataset_shift_age_mean_gap_matrix.png", bbox_inches="tight")
+    fig.savefig(TABLE_DIR / "dataset_shift_age_mean_gap_matrix.pdf", bbox_inches="tight")
     plt.close(fig)
 
 
@@ -622,7 +628,7 @@ def _plot_lodo_train_test_age_gap(age_df: pd.DataFrame) -> None:
     ax.legend(frameon=True, loc="upper right")
     _style_axis(ax, grid_axis="y")
 
-    fig.savefig(TABLE_DIR / "dataset_shift_lodo_train_test_age_gap.png", bbox_inches="tight")
+    fig.savefig(TABLE_DIR / "dataset_shift_lodo_train_test_age_gap.pdf", bbox_inches="tight")
     plt.close(fig)
 
 
@@ -908,7 +914,7 @@ def _plot_overview(age_df: pd.DataFrame) -> None:
     _plot_overview_sex_balance(ax_sex, ordered_summary, ordered_datasets, ordered_labels)
     _plot_overview_diagnosis(ax_diag, diagnosis_summary, ordered_datasets)
 
-    fig.savefig(TABLE_DIR.parent / "figures" / "figure2_dataset_overview.png", bbox_inches="tight")
+    fig.savefig(FIGURE_DIR / "figure2_dataset_overview.pdf", bbox_inches="tight")
     plt.close(fig)
 
 
@@ -922,6 +928,12 @@ def parse_args() -> argparse.Namespace:
         help="Directory for input/output tables.",
     )
     parser.add_argument(
+        "--figure_dir",
+        type=Path,
+        default=DEFAULT_FIGURES_DIR,
+        help="Directory for generated figure outputs.",
+    )
+    parser.add_argument(
         "--include_components",
         action="store_true",
         help="Also write intermediate component plots that are not standalone PDF figures.",
@@ -932,14 +944,16 @@ def parse_args() -> argparse.Namespace:
 def main(
     pkl_dir: Path = DEFAULT_ATLAS_DIR,
     table_dir: Path = DEFAULT_TABLES_DIR,
+    figure_dir: Path | str = DEFAULT_FIGURES_DIR,
     include_components: bool = False,
 ) -> None:
-    global PKL_DIR, TABLE_DIR
+    global PKL_DIR, TABLE_DIR, FIGURE_DIR
     PKL_DIR = pkl_dir
     TABLE_DIR = table_dir
+    FIGURE_DIR = Path(figure_dir)
 
     TABLE_DIR.mkdir(parents=True, exist_ok=True)
-    (TABLE_DIR.parent / "figures").mkdir(parents=True, exist_ok=True)
+    FIGURE_DIR.mkdir(parents=True, exist_ok=True)
     age_df, meta = _load_data()
     if include_components:
         _plot_age_distributions(age_df)
@@ -954,5 +968,6 @@ if __name__ == "__main__":
     main(
         pkl_dir=cli_args.pkl_dir,
         table_dir=cli_args.table_dir,
+        figure_dir=cli_args.figure_dir,
         include_components=cli_args.include_components,
     )

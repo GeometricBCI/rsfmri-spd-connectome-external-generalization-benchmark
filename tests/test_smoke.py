@@ -57,13 +57,13 @@ def test_grouped_validation_split_keeps_subjects_disjoint():
     assert len(np.unique(groups[sub_val])) == 2
 
 
-def test_corrvec_uses_off_diagonal_upper_triangle():
+def test_corrvec_uses_isometric_off_diagonal_upper_triangle():
     matrices = np.arange(2 * 4 * 4, dtype=float).reshape(2, 4, 4)
 
     features = vectorize_correlation_upper(matrices)
 
     assert features.shape == (2, 6)
-    assert np.array_equal(features[0], np.array([1, 2, 3, 6, 7, 11], dtype=float))
+    assert np.allclose(features[0], np.sqrt(2.0) * np.array([1, 2, 3, 6, 7, 11], dtype=float))
 
 
 def test_spdnet_forward_shape_for_small_spd_batch():

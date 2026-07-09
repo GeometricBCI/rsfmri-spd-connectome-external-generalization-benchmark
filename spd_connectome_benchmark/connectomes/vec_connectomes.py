@@ -58,15 +58,23 @@ def estimate_connectome_matrices(
     return correlations
 
 
-def vectorize_correlation_matrices(X: np.ndarray, include_diagonal: bool = False) -> np.ndarray:
+def vectorize_correlation_matrices(
+    X: np.ndarray,
+    include_diagonal: bool = False,
+    isometric: bool = True,
+) -> np.ndarray:
     """Vectorize correlation matrices for Euclidean baselines.
 
-    Paper §2.5.3: CorrVec uses off-diagonal upper-triangular entries and does
-    not apply the tangent-space ``sqrt(2)`` off-diagonal weighting.
+    The isometric convention preserves the Frobenius inner product of symmetric
+    matrices by multiplying off-diagonal upper-triangular entries by ``sqrt(2)``.
     """
     offset = 0 if include_diagonal else 1
     tri_i, tri_j = np.triu_indices(X.shape[1], k=offset)
-    return X[:, tri_i, tri_j].astype(np.float64, copy=False)
+    vectors = X[:, tri_i, tri_j].astype(np.float64, copy=True)
+    if isometric:
+        off_diagonal = tri_i != tri_j
+        vectors[:, off_diagonal] *= np.sqrt(2.0)
+    return vectors
 
 
 def vectorize_correlation_upper(X: np.ndarray) -> np.ndarray:

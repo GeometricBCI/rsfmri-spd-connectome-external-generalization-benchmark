@@ -20,6 +20,7 @@ from torch.utils.data import DataLoader
 
 from sklearn.model_selection import GroupKFold, GridSearchCV
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import Ridge
 from sklearn.dummy import DummyRegressor
 
@@ -361,7 +362,10 @@ def run_pooled_age_benchmarks(
             n_groups_tr = len(np.unique(g_tr))
             inner_k = min(args.ridge_inner_splits, n_groups_tr)
 
-            pipe = Pipeline([("ridge", Ridge(random_state=args.seed))])
+            pipe = Pipeline([
+                ("scaler", StandardScaler()),
+                ("ridge", Ridge(random_state=args.seed)),
+            ])
 
             def _fit_predict(Z_train, Z_test, label):
                 if inner_k < 2:
@@ -435,8 +439,7 @@ def run_pooled_age_benchmarks(
             X_te, y_te = X64[test_idx], y64[test_idx]
             g_tr = subject_ids[train_idx]
 
-            # Paper Methods 2.5.3: CorrVec uses off-diagonal upper-triangle
-            # correlations and no sqrt(2) tangent weighting.
+            # CorrVec uses the isometric off-diagonal upper-triangle convention.
             Z_tr = vectorize_correlation_upper(X_tr)
             Z_te = vectorize_correlation_upper(X_te)
 
@@ -457,13 +460,16 @@ def run_pooled_age_benchmarks(
                     train_idx=train_idx,
                     test_idx=test_idx,
                     feature_kind="corr_upper",
-                    feature_metric="upper_triangle",
+                    feature_metric="isometric_upper_triangle",
                 )
 
             n_groups_tr = len(np.unique(g_tr))
             inner_k = min(args.ridge_inner_splits, n_groups_tr)
 
-            pipe = Pipeline([("ridge", Ridge(random_state=args.seed))])
+            pipe = Pipeline([
+                ("scaler", StandardScaler()),
+                ("ridge", Ridge(random_state=args.seed)),
+            ])
 
             def _fit_predict(Z_train, Z_test, label):
                 if inner_k < 2:

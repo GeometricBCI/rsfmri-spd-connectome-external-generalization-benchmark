@@ -9,6 +9,12 @@ __pycache__/
 data/
 results/benchmark_csv/
 results/model_weights/
+results/figures/
+results/figures_*/
+results/tables/
+results/harmonized*/
+results/**/*.npz
+results/**/*.pdf
 model_paras*/
 results_*/
 

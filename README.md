@@ -45,11 +45,11 @@ results/
     table1_dataset_summary.csv
     table3_lodo_per_dataset_metrics.csv
   figures/
-    figure2_dataset_overview.png
-    figure3_within_dataset_negmae.png
-    figure3_within_dataset_r2.png
-    figure4_pooled_benchmark.png
-    figure5_spdnet_ablation.png
+    figure2_dataset_overview.pdf
+    figure3_within_dataset_negmae.pdf
+    figure3_within_dataset_r2.pdf
+    figure4_pooled_benchmark.pdf
+    figure5_spdnet_ablation.pdf
 ```
 
 ## Data Setup
