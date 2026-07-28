@@ -1,37 +1,54 @@
-"""Shared benchmark utilities for the SPD connectome experiments.
-
-Dataset loading, fold splitting, training helpers, metrics, and CSV writers
-live here so the benchmark entry points can read like the paper protocol.
-"""
+"""Dataset loading, training helpers, and metric compatibility exports."""
 
 from __future__ import annotations
 
-import json
-import os
 import pickle
-import platform
-import random
-import sys
-import time
-import warnings
 from dataclasses import dataclass
-from importlib import metadata
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
 import torch
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import GroupKFold, GroupShuffleSplit
 from torch.utils.data import Dataset
 
 from spd_connectome_benchmark.config import (
     DEFAULT_DATA_ROOT,
     DEFAULT_DEBUG_SAMPLE_COUNT,
-    DEFAULT_RANDOM_SEED,
-    DEFAULT_VALIDATION_SIZE,
 )
+from spd_connectome_benchmark.data_contract import validate_timeseries
+from spd_connectome_benchmark.datasets import (
+    ATLAS_REGISTRY,
+    canonical_atlas_name,
+    canonical_dataset_name,
+)
+from spd_connectome_benchmark.splits import (
+    make_groupkfold_splits as _make_groupkfold_splits,
+    make_lodo_splits as _make_lodo_splits,
+    split_train_validation_by_group as _split_train_validation_by_group,
+)
+from spd_connectome_benchmark.results import (
+    save_metrics_csv as _save_metrics_csv,
+    save_protocol_metrics_csv as _save_protocol_metrics_csv,
+    save_run_metadata_sidecar as _save_run_metadata_sidecar,
+    timestamp_tag as _timestamp_tag,
+)
+from spd_connectome_benchmark.training import (
+    ensure_nonempty_training_batches as _ensure_nonempty_training_batches,
+    set_global_random_seed as _set_global_random_seed,
+)
+
+# Backward-compatible public names for existing entry points and external users.
+make_groupkfold_splits = _make_groupkfold_splits
+make_lodo_splits = _make_lodo_splits
+split_train_validation_by_group = _split_train_validation_by_group
+save_metrics_csv = _save_metrics_csv
+save_protocol_metrics_csv = _save_protocol_metrics_csv
+save_run_metadata_sidecar = _save_run_metadata_sidecar
+timestamp_tag = _timestamp_tag
+ensure_nonempty_training_batches = _ensure_nonempty_training_batches
+set_global_random_seed = _set_global_random_seed
 
 
 @dataclass(frozen=True)
@@ -42,20 +59,6 @@ class LoadedAgeDataset:
     dataset_ids: np.ndarray
     timeseries: list[np.ndarray]
     targets: np.ndarray
-
-
-def set_global_random_seed(seed: int) -> None:
-    """Set run-level RNG seeds used by the fixed-seed benchmark protocol."""
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-
-
-def timestamp_tag() -> str:
-    """Return the timestamp format used by benchmark output files."""
-    return time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
 
 
 def load_age_timeseries(
@@ -74,32 +77,55 @@ def load_age_timeseries(
     non-dataset-sorted scan order. The returned groups are subject identifiers;
     callers that pool datasets should prefix them with the dataset name.
     """
+    dataset = canonical_dataset_name(dataset)
+    atlas_name = canonical_atlas_name(atlas_name)
+    expected_regions = ATLAS_REGISTRY[atlas_name].n_regions
     data_root = Path(data_root or DEFAULT_DATA_ROOT).expanduser()
     file_path = data_root / f"atlas_{atlas_name}" / f"{dataset}_X_y.pkl"
     if not file_path.exists():
         raise FileNotFoundError(
             f"Prepared dataset file not found: {file_path}. "
-            "Download the processed benchmark archive, run "
+            "Reconstruct it from independently authorized local sources with "
             "prepare_fmri_datasets.py, pass --data_root, or set "
-            "RSFMRI_SPD_DATA_ROOT."
+            "RSFMRI_SPD_DATA_ROOT. No processed participant-data archive is "
+            "distributed by this repository."
         )
 
     with open(file_path, "rb") as f:
         df = pickle.load(f)
 
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("Prepared dataset must deserialize to a pandas DataFrame.")
+    missing_columns = sorted({"SubjectID", "TimeSeries"} - set(df.columns))
+    if missing_columns:
+        raise ValueError(
+            "Prepared dataset is missing required columns: "
+            + ", ".join(missing_columns)
+        )
     df = df.reset_index(drop=True)
     if task not in df.columns:
-        warnings.warn(f"Task {task} not available in dataset {dataset}")
-        return None, None, None, None
+        raise ValueError(
+            f"Prepared dataset {dataset!r} is missing required target column "
+            f"{task!r}."
+        )
 
     row_order = rng.permutation(np.arange(len(df)))
     df = df.iloc[row_order].reset_index(drop=True)
 
     subject_ids = df["SubjectID"].values
-    timeseries = [np.asarray(t) for t in df["TimeSeries"].values]
+    if any(pd.isna(subject_id) or not str(subject_id).strip() for subject_id in subject_ids):
+        raise ValueError("Prepared dataset contains an empty SubjectID.")
+    timeseries = list(
+        validate_timeseries(
+            [np.asarray(t) for t in df["TimeSeries"].values],
+            expected_regions=expected_regions,
+        )
+    )
 
     if task == "Age":
         y = df[task].values.astype("float32")
+        if not np.isfinite(y).all():
+            raise ValueError("Age target contains NaN or infinity.")
         y_type = "continuous"
     else:
         raise ValueError("This benchmark module currently supports Age regression only.")
@@ -160,7 +186,8 @@ def load_pooled_age_dataset(
     all_timeseries: list[np.ndarray] = []
     all_targets: list[np.ndarray] = []
 
-    for dataset in datasets:
+    for raw_dataset in datasets:
+        dataset = canonical_dataset_name(raw_dataset)
         subject_ids, timeseries, targets, _ = load_age_timeseries(
             dataset=dataset,
             atlas_name=atlas_name,
@@ -169,11 +196,6 @@ def load_pooled_age_dataset(
             rng=rng,
             data_root=data_root,
         )
-        if subject_ids is None:
-            if verbose:
-                print(f"[WARN] Skip dataset {dataset} (load failed or task missing).")
-            continue
-
         prefixed_subject_ids = np.array([f"{dataset}_{sid}" for sid in subject_ids], dtype=object)
         dataset_ids = np.array([dataset] * len(prefixed_subject_ids), dtype=object)
 
@@ -204,57 +226,6 @@ def load_pooled_age_dataset(
         timeseries=all_timeseries,
         targets=y,
     )
-
-
-def make_groupkfold_splits(
-    X: np.ndarray,
-    y: np.ndarray,
-    groups: np.ndarray,
-    n_splits: int,
-) -> tuple[list[tuple[np.ndarray, np.ndarray]], list[str]]:
-    """Create subject-grouped K-fold splits with legacy R1..RK labels.
-
-    Paper §2.7 sets K=5 for reported GroupKFold experiments; the caller keeps
-    the original configurable ``n_splits`` default.
-    """
-    splitter = GroupKFold(n_splits=n_splits)
-    splits = list(splitter.split(X, y, groups=groups))
-    fold_names = [f"R{i}" for i in range(1, len(splits) + 1)]
-    return splits, fold_names
-
-
-def make_lodo_splits(dataset_ids: np.ndarray) -> tuple[list[tuple[np.ndarray, np.ndarray]], list[str]]:
-    """Create leave-one-dataset-out splits in the pooled dataset order.
-
-    Paper §2.7 defines each LODO test fold as one complete held-out dataset.
-    """
-    splits: list[tuple[np.ndarray, np.ndarray]] = []
-    fold_names: list[str] = []
-    for dataset in pd.unique(dataset_ids):
-        test_idx = np.where(dataset_ids == dataset)[0]
-        train_idx = np.where(dataset_ids != dataset)[0]
-        if len(test_idx) == 0 or len(train_idx) == 0:
-            continue
-        splits.append((train_idx, test_idx))
-        fold_names.append(f"TEST_{dataset}")
-    return splits, fold_names
-
-
-def split_train_validation_by_group(
-    train_idx: np.ndarray,
-    groups: np.ndarray,
-    val_size: float = DEFAULT_VALIDATION_SIZE,
-    seed: int = DEFAULT_RANDOM_SEED,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Reserve grouped validation data inside one outer training fold.
-
-    Paper §2.7 and Supplementary Methods reserve 10% of outer-train groups for
-    validation using a fixed seed. Entry-point parsers pass the original
-    experiment defaults ``test_size=0.1`` and ``random_state=1``.
-    """
-    splitter = GroupShuffleSplit(n_splits=1, test_size=val_size, random_state=seed)
-    sub_train, sub_val = next(splitter.split(train_idx, groups=groups[train_idx]))
-    return train_idx[sub_train], train_idx[sub_val]
 
 
 class MatrixRegressionDataset(Dataset):
@@ -437,38 +408,6 @@ def format_metrics_for_log(metrics: Mapping[str, float]) -> str:
     return " | ".join(f"{name.replace('_', ' ')} {value:.4f}" for name, value in metrics.items())
 
 
-def save_metrics_csv(metrics: Mapping[str, Sequence[float]], n_splits: int, out_csv: str, elapsed: float):
-    """Save single-dataset fold metrics using legacy R1..Rn column names."""
-    columns = [f"R{i}" for i in range(1, n_splits + 1)] + ["Avg", "Time(sec)"]
-    df = pd.DataFrame(columns=columns)
-    for metric_name, values in metrics.items():
-        df.loc[metric_name] = list(values) + [float(np.mean(values))] + [elapsed]
-    Path(out_csv).parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(out_csv, index=True)
-    save_run_metadata_sidecar(out_csv, elapsed=elapsed)
-    return df
-
-
-def save_protocol_metrics_csv(fold_metrics, fold_names, elapsed, csv_path):
-    """Save pooled-dataset fold metrics with protocol-specific fold labels."""
-
-    def average_metric(values: Iterable[float]) -> float:
-        arr = np.asarray(list(values), dtype=np.float64)
-        if arr.size == 0 or np.all(np.isnan(arr)):
-            return np.nan
-        return float(np.nanmean(arr))
-
-    columns = list(fold_names) + ["Avg", "Time(sec)"]
-    df = pd.DataFrame(columns=columns)
-    for metric_name, metric_values in fold_metrics.items():
-        df.loc[metric_name] = list(metric_values) + [average_metric(metric_values)] + [elapsed]
-    Path(csv_path).parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(csv_path, index=True)
-    save_run_metadata_sidecar(csv_path, elapsed=elapsed)
-    print("Saved:", csv_path)
-    return df
-
-
 def init_fold_metrics(protocol_tag: str) -> dict[str, list[float]]:
     return {name: [] for name in metric_names_for_protocol(protocol_tag)}
 
@@ -476,55 +415,3 @@ def init_fold_metrics(protocol_tag: str) -> dict[str, list[float]]:
 def append_fold_metrics(fold_metrics: dict[str, list[float]], metrics: Mapping[str, float]) -> None:
     for name in fold_metrics:
         fold_metrics[name].append(float(metrics[name]))
-
-
-def _dependency_versions() -> dict[str, str]:
-    packages = [
-        "spd-learn",
-        "torch",
-        "pyriemann",
-        "scikit-learn",
-        "nilearn",
-        "nibabel",
-        "neuroHarmonize",
-        "neuroCombat",
-        "statsmodels",
-        "numpy",
-        "pandas",
-        "scipy",
-        "matplotlib",
-        "seaborn",
-    ]
-    versions = {}
-    for package in packages:
-        try:
-            versions[package] = metadata.version(package)
-        except metadata.PackageNotFoundError:
-            versions[package] = "not-installed"
-    return versions
-
-
-def save_run_metadata_sidecar(csv_path: str | Path, *, elapsed: float | None = None) -> Path:
-    """Write a lightweight reproducibility sidecar next to a result CSV."""
-    csv_path = Path(csv_path)
-    sidecar_path = csv_path.with_suffix(csv_path.suffix + ".metadata.json")
-    metadata_payload = {
-        "created_at": timestamp_tag(),
-        "elapsed_seconds": None if elapsed is None else float(elapsed),
-        "command": sys.argv,
-        "cwd": str(Path.cwd()),
-        "python": {
-            "version": sys.version,
-            "implementation": platform.python_implementation(),
-            "platform": platform.platform(),
-        },
-        "environment": {
-            "RSFMRI_SPD_DATA_ROOT": os.environ.get("RSFMRI_SPD_DATA_ROOT"),
-            "RSFMRI_SPD_RAW_DATA_DIR": os.environ.get("RSFMRI_SPD_RAW_DATA_DIR"),
-            "RSFMRI_SPD_ADNI_ADNIDOD_RAW_DIR": os.environ.get("RSFMRI_SPD_ADNI_ADNIDOD_RAW_DIR"),
-            "RSFMRI_SPD_OASIS3_RAW_DIR": os.environ.get("RSFMRI_SPD_OASIS3_RAW_DIR"),
-        },
-        "dependencies": _dependency_versions(),
-    }
-    sidecar_path.write_text(json.dumps(metadata_payload, indent=2, sort_keys=True))
-    return sidecar_path

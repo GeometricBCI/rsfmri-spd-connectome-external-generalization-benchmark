@@ -1,8 +1,8 @@
 """Prepare benchmark rs-fMRI time-series tables from raw/local sources.
 
-This script is optional when users download the processed ``*_X_y.pkl`` files
-directly. It exists for users who need to rebuild those files from source
-datasets and local fMRIPrep outputs.
+Use this script only after independently obtaining authorized source datasets.
+It reconstructs trusted local ``*_X_y.pkl`` files from those sources and local
+fMRIPrep outputs; no processed participant-data archive is distributed here.
 """
 
 import argparse
@@ -18,7 +18,6 @@ import nilearn
 import numpy as np
 import pandas as pd
 import tabulate
-from nilearn.datasets import fetch_atlas_schaefer_2018, fetch_atlas_msdl
 from nilearn.datasets._utils import (
     fetch_files,
     get_dataset_descr,
@@ -38,7 +37,9 @@ from spd_connectome_benchmark.config import (
     DEFAULT_OASIS3_RAW_DIR,
     DEFAULT_RAW_DATA_DIR,
     PAPER_DATASETS,
+    ensure_data_path_outside_project,
 )
+from spd_connectome_benchmark.datasets import canonical_atlas_name
 
 AVAILABLE_ATLASES  = ["msdl_39", "schaefer_100"]
 
@@ -102,14 +103,17 @@ def fetch_adni_adnidod_oasis3(n_subjects=10, data_dir=None):
 
 
 def get_nifti_masker(atlas_name):
+    atlas_name = canonical_atlas_name(atlas_name)
     if atlas_name == "schaefer_100":
         atlas  = nilearn.datasets.fetch_atlas_schaefer_2018(n_rois=100).maps
         masker = NiftiLabelsMasker(atlas, standardize=True, detrend=True).fit()
-    elif atlas_name == "msdl":
+    elif atlas_name == "msdl_39":
         atlas  = nilearn.datasets.fetch_atlas_msdl().maps
         masker = NiftiMapsMasker(atlas, standardize=True, detrend=True).fit()
     else:
-        raise ValueError(f"Only 'schaefer_100' and 'msdl' are supported, got {atlas_name}")
+        raise ValueError(
+            f"Only 'schaefer_100' and 'msdl_39' are supported, got {atlas_name}"
+        )
     return masker
 
 
@@ -166,58 +170,27 @@ def extract_timeseries_adni_adnidod_oasis3(fmri_data, atlas_name, n_jobs):
     return fmri_data
 
 
-# last fetch_cobre from Nilearn (2021)
 def fetch_cobre(n_subjects=10, data_dir=None, url=None, verbose=1):
-    """Fetch COBRE datasets preprocessed using NIAK 0.17 under CentOS
-    version 6.3 with Octave version 4.0.2 and the Minc toolkit version 0.3.18.
-    Downloads and returns COBRE preprocessed resting state fMRI datasets,
-    covariates and phenotypic information such as demographic, clinical
-    variables, measure of frame displacement FD (an average FD for all the time
-    frames left after censoring).
-    Each subject `fmri_XXXXXXX.nii.gz` is a 3D+t nifti volume (150 volumes).
-    WARNING: no confounds were actually regressed from the data, so it can be
-    done interactively by the user who will be able to explore different
-    analytical paths easily.
-    For each subject, there is `fmri_XXXXXXX.tsv` files which contains the
-    covariates such as motion parameters, mean CSF signal that should to be
-    regressed out of the functional data.
-    `keys_confounds.json`: a json file, that describes each variable mentioned
-    in the files `fmri_XXXXXXX.tsv.gz`. It also contains a list of time frames
-    that have been removed from the time series by censoring for high motion.
-    `phenotypic_data.tsv` contains the data of clinical variables that
-    explained in `keys_phenotypic_data.json`
-    .. versionadded:: 0.3
-    Warnings
-    --------
-    'fetch_cobre' has been deprecated and will be removed in release 0.9.
+    """Download the legacy NIAK-preprocessed COBRE release from Figshare.
+
+    This compatibility helper was adapted from Nilearn's deprecated
+    ``fetch_cobre`` implementation as it existed in 2021. It performs network
+    requests and returns local paths to functional images and confound files,
+    together with the phenotypic table. Callers are responsible for reviewing
+    the current upstream access and use conditions before downloading.
+
     Parameters
     ----------
-    n_subjects : int, optional
-        The number of subjects to load from maximum of 146 subjects.
-        By default, 10 subjects will be loaded. If n_subjects=None,
-        all subjects will be loaded. Default=10.
-    %(data_dir)s
-    %(url)s
-    %(verbose)s
-    Returns
-    -------
-    data : Bunch
-        Dictionary-like object, the attributes are:
-        - 'func': string list
-            Paths to Nifti images.
-        - 'confounds': string list
-            Paths to .tsv files of each subject, confounds.
-        - 'phenotypic': numpy.recarray
-            Contains data of clinical variables, sex, age, FD.
-        - 'description': data description of the release and references.
-        - 'desc_con': str
-            description of the confounds variables
-        - 'desc_phenotypic': str
-            description of the phenotypic variables.
-    Notes
-    -----
-    See `more information about datasets structure
-    <https://figshare.com/articles/COBRE_preprocessed_with_NIAK_0_17_-_lightweight_release/4197885>`_
+    n_subjects : int or None
+        Maximum number of participants to return; ``None`` requests all
+        available participants.
+    data_dir : path-like or None
+        Local download/cache directory.
+    url : str or None
+        Figshare article API endpoint. The historical endpoint is used when
+        omitted.
+    verbose : int
+        Verbosity passed to the Nilearn download helpers.
     """
     if url is None:
         # Here we use the file that provides URL for all others
@@ -368,27 +341,60 @@ def fetch_cobre(n_subjects=10, data_dir=None, url=None, verbose=1):
 
 def global_signal_regression(fmri_path, confounds=None):
     if confounds is None:
-        raise NotImplementedError("No confounds provided")
+        raise ValueError("Global signal regression requires confound entries.")
+    if len(confounds) != len(fmri_path):
+        raise ValueError(
+            "Global signal regression requires one confound entry per fMRI image."
+        )
 
     # Determine type of var confounds
-    i = 0
-    while confounds[i] is None:
-        i += 1
-    type_confounds = type(confounds[i])
+    first_confounds = next(
+        (entry for entry in confounds if entry is not None),
+        None,
+    )
+    if first_confounds is None:
+        raise ValueError(
+            "Global signal regression cannot run because all confound entries "
+            "are missing."
+        )
+    if isinstance(first_confounds, np.ndarray):
+        confound_kind = "array"
+    elif isinstance(first_confounds, pd.DataFrame):
+        confound_kind = "dataframe"
+    else:
+        raise TypeError(
+            "Confound entries must be NumPy arrays or pandas DataFrames."
+        )
+    for entry in confounds:
+        if entry is None:
+            continue
+        if confound_kind == "array" and not isinstance(entry, np.ndarray):
+            raise TypeError("All non-missing confound entries must have one type.")
+        if confound_kind == "dataframe" and not isinstance(entry, pd.DataFrame):
+            raise TypeError("All non-missing confound entries must have one type.")
 
     # Add global signal to confounds
     for i, f in enumerate(fmri_path):
         gsr = np.mean(nib.load(str(f)).get_fdata(), axis=(0, 1, 2))
-        if type_confounds is np.ndarray:
+        if confound_kind == "array":
             if confounds[i] is None:
                 confounds[i] = gsr
             else:
+                if len(confounds[i]) != len(gsr):
+                    raise ValueError(
+                        f"Confound entry at index {i} has {len(confounds[i])} "
+                        f"rows; the fMRI image has {len(gsr)} time points."
+                    )
                 confounds[i] = np.column_stack((gsr, confounds[i]))
         else:
-            assert type_confounds is pd.DataFrame
             if confounds[i] is None:
                 confounds[i] = pd.DataFrame(gsr, columns=["global_signal"])
             else:
+                if len(confounds[i]) != len(gsr):
+                    raise ValueError(
+                        f"Confound entry at index {i} has {len(confounds[i])} "
+                        f"rows; the fMRI image has {len(gsr)} time points."
+                    )
                 confounds[i]["global_signal"] = gsr
 
     return confounds
@@ -401,47 +407,55 @@ def filter_data(
     max_cond=MAX_COND,
     max_null_regions=MAX_NULL_REGIONS
 ):
-    """Filter data to keep only time series from df["TimeSeries"]) with
-    1) a minium of min_len time points
-    2) OAS conditioning between min_cond and max_cond
-    3) a maximum of max_null_regions null regions
+    """Keep time series that satisfy length, conditioning, and null-ROI limits.
+
+    A retained series has at least ``min_len`` time points, an OAS covariance
+    condition number between ``min_cond`` and ``max_cond``, and no more than
+    ``max_null_regions`` regions whose full time course is zero.
     """
     # Minimum length
     mask = df["TimeSeries"].apply(len) >= min_len
 
     # OAS conditioning
     cov = [OAS().fit(t).covariance_ for t in df["TimeSeries"]]
+
     def compute_cond(c):
         eigvals = np.linalg.eigvalsh(c)
         return eigvals.max() / eigvals.min()
+
     cond = np.array([compute_cond(c) for c in cov])
     mask = mask & (cond >= min_cond) & (cond <= max_cond)
 
-    # to know if a time series has a null region
-    # check if there is a zero in np.linalg.norm(ts, axis=0) 
-    null_regions = df["TimeSeries"].apply(lambda ts: np.sum(np.linalg.norm(ts, axis=0) == 0))
+    # A zero column norm identifies a region with no temporal variation.
+    null_regions = df["TimeSeries"].apply(
+        lambda ts: np.sum(np.linalg.norm(ts, axis=0) == 0)
+    )
     mask         = mask & (null_regions <= max_null_regions)
 
     if np.sum(mask) != len(mask):
         warnings.warn(
             f"Removing {np.sum(~mask)} time series with less than {min_len} time points, "
             f"conditioning outside [{min_cond}, {max_cond}], or more than {max_null_regions} null regions."
-            f"Percentage of removed time series: {np.sum(~mask) / len(mask) * 100:.0f}%"
+            f" Percentage removed: {np.sum(~mask) / len(mask) * 100:.0f}%"
         )
-
-    # Filter data
-    new_ts = df["TimeSeries"][mask]
 
     return df[mask]
 
 
 def postprocess_sample_mask(sample_mask, fmri_paths, start_idx=SAMPLE_MASK_START_IDX):
-    """Post process sample_mask to remove start_idx first data points"""
+    """Remove pre-start samples and reject entries with no retained time points."""
+    fmri_paths = list(fmri_paths)
     new_sample_mask = list()
     if sample_mask is None:
         sample_mask = [None] * len(fmri_paths)
+    else:
+        sample_mask = list(sample_mask)
+        if len(sample_mask) != len(fmri_paths):
+            raise ValueError(
+                "Sample masks and fMRI paths must contain the same number of entries."
+            )
 
-    for (mask, f) in zip(sample_mask, fmri_paths):
+    for mask_index, (mask, f) in enumerate(zip(sample_mask, fmri_paths)):
         if mask is None:
             # Load the data
             data = nib.load(f).get_fdata()
@@ -453,10 +467,28 @@ def postprocess_sample_mask(sample_mask, fmri_paths, start_idx=SAMPLE_MASK_START
             new_mask = np.arange(start_idx, length)
         else:
             # Remove the first START_IDX data points
-            i = 0
-            while mask[i] < start_idx:
-                i += 1
-            new_mask = mask[i:]
+            mask = np.asarray(mask)
+            if mask.ndim != 1:
+                raise ValueError(
+                    f"Sample mask at index {mask_index} must be one-dimensional."
+                )
+            if mask.size == 0:
+                raise ValueError(
+                    f"Sample mask at index {mask_index} is empty."
+                )
+            retained_indices = np.flatnonzero(mask >= start_idx)
+            if retained_indices.size == 0:
+                raise ValueError(
+                    f"Sample mask at index {mask_index} retains no time points "
+                    f"at or after start_idx={start_idx}."
+                )
+            new_mask = mask[retained_indices[0]:]
+
+        if new_mask.size == 0:
+            raise ValueError(
+                f"Sample mask at index {mask_index} retains no time points "
+                f"at or after start_idx={start_idx}."
+            )
 
         new_sample_mask.append(new_mask)
 
@@ -804,7 +836,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=(
             "Prepare *_X_y.pkl benchmark files from raw/local rs-fMRI sources. "
-            "Skip this step if you downloaded the processed data archive."
+            "Source data must be independently obtained under applicable terms."
         )
     )
     parser.add_argument("--debug", action="store_true", help="Debug mode")
@@ -854,20 +886,44 @@ if __name__ == "__main__":
     )
 
     args       = parser.parse_args()
-    DEFAULT_DATA_ROOT = args.data_root.expanduser()
+    try:
+        DEFAULT_DATA_ROOT = ensure_data_path_outside_project(
+            args.data_root,
+            label="--data_root",
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
     raw_data_dir = (
         args.raw_data_dir
         or Path(os.environ.get("RSFMRI_SPD_RAW_DATA_DIR", DEFAULT_DATA_ROOT / "raw_data"))
-    ).expanduser()
+    )
+    try:
+        raw_data_dir = ensure_data_path_outside_project(
+            raw_data_dir,
+            label="--raw_data_dir",
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
     PATH_RAW_DATA = raw_data_dir
-    PATH_RAW_DATA_ADNI_ADNIDOD = (
+    adni_adnidod_raw_dir = (
         args.adni_adnidod_raw_dir
         or Path(os.environ.get("RSFMRI_SPD_ADNI_ADNIDOD_RAW_DIR", raw_data_dir))
-    ).expanduser()
-    PATH_RAW_DATA_OASIS3 = (
+    )
+    oasis3_raw_dir = (
         args.oasis3_raw_dir
         or Path(os.environ.get("RSFMRI_SPD_OASIS3_RAW_DIR", raw_data_dir))
-    ).expanduser()
+    )
+    try:
+        PATH_RAW_DATA_ADNI_ADNIDOD = ensure_data_path_outside_project(
+            adni_adnidod_raw_dir,
+            label="--adni_adnidod_raw_dir",
+        )
+        PATH_RAW_DATA_OASIS3 = ensure_data_path_outside_project(
+            oasis3_raw_dir,
+            label="--oasis3_raw_dir",
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
     debug      = args.debug
     datasets   = args.dataset.lower()
     datasets   = AVAILABLE_DATASETS if datasets == "all" else [datasets]

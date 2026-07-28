@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "aggregate_outputs": {
+      "const": []
+    },
+    "datasets": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "atlas": {
+            "const": "schaefer_100"
+          },
+          "dataset": {
+            "const": "abide"
+          },
+          "files": {
+            "additionalProperties": false,
+            "properties": {
+              "connectomes": {
+                "$ref": "#/$defs/file"
+              },
+              "metadata": {
+                "$ref": "#/$defs/file"
+              },
+              "splits": {
+                "$ref": "#/$defs/file"
+              }
+            },
+            "required": [
+              "connectomes",
+              "metadata",
+              "splits"
+            ],
+            "type": "object"
+          },
+          "matrix_type": {
+            "const": "correlation"
+          },
+          "n_regions": {
+            "const": 100
+          },
+          "sample_count": {
+            "const": 3
+          },
+          "source_binding_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dataset",
+          "sample_count",
+          "matrix_type",
+          "atlas",
+          "n_regions",
+          "source_binding_sha256",
+          "files"
+        ],
+        "type": "object"
+      },
+      "maxItems": 1,
+      "minItems": 1,
+      "type": "array"
+    },
+    "kind": {
+      "const": "trusted_safe_export"
+    },
+    "producer": {
+      "const": "tools.zenodo.export_internal"
+    },
+    "schema_version": {
+      "const": 1
+    }
+  },
+  "required": [
+    "schema_version",
+    "kind",
+    "producer",
+    "datasets",
+    "aggregate_outputs"
+  ],
+  "title": "Runtime synthetic safe-export manifest contract",
+  "type": "object",
+  "$defs": {
+    "file": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "pattern": "^datasets/abide/(connectomes\\.npz|metadata\\.tsv|splits\\.tsv)$",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "type": "object"
+    }
+  }
+}

@@ -4,19 +4,65 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+.venv/
+venv/
 
-# Local experiment outputs
+# Participant-level and raw neuroimaging data (never commit).
 data/
-results/benchmark_csv/
-results/model_weights/
-results/figures/
-results/figures_*/
-results/tables/
-results/harmonized*/
-results/**/*.npz
-results/**/*.pdf
+dataset/
+datasets/
+raw_data/
+local_data/
+*.pkl
+*.pickle
+*.nii
+*.nii.gz
+*.dcm
+*.ima
+*.bidsignore
+participants.tsv
+participants.json
+*_scans.tsv
+*_sessions.tsv
+*_events.tsv
+*phenotypic*.csv
+*_phenotype.csv
+phenotype/
+phenotypes/
+sourcedata/
+derivatives/
+sub-*/
+ses-*/
+
+# Local experiment outputs and caches.
+outputs/
+benchmark_outputs/
+results/
 model_paras*/
 results_*/
+*.npz
+*.pt
+*.pth
+*.ckpt
+*.metadata.json
+run_config_*.json
+**/[[]*.csv
+
+# Generated release staging owned by the packaging workflow.
+zenodo_upload/
+
+# Credentials, local environment, and tokens.
+.env
+.env.*
+!.env.example
+*.token
+*.key
+credentials*
+secrets*
 
 # Local editor and OS metadata
 .DS_Store

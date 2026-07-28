@@ -1,0 +1,248 @@
+schema_version: 1
+
+default:
+  participant_level_release: forbidden
+  final_approval_status: not_approved
+  unknown_fields: deny
+  unknown_content_categories: deny
+  decisions:
+    participant_level_connectomes: forbidden
+    participant_level_metadata: forbidden
+    exact_split_membership: forbidden
+    aggregate_metrics: allowed_if_explicitly_allowlisted_and_reviewed
+    statistical_summaries: allowed_if_explicitly_allowlisted_and_reviewed
+    figure_source_data: allowed_if_explicitly_allowlisted_and_reviewed
+    configuration_files: allowed_if_explicitly_allowlisted_and_reviewed
+    processing_scripts: allowed_if_explicitly_allowlisted_and_reviewed
+    reconstruction_instructions: allowed_if_explicitly_allowlisted_and_reviewed
+
+unknown_dataset:
+  participant_level_release: forbidden
+  final_approval_status: not_approved
+  decisions:
+    participant_level_connectomes: forbidden
+    participant_level_metadata: forbidden
+    exact_split_membership: forbidden
+    aggregate_metrics: forbidden
+    statistical_summaries: forbidden
+    figure_source_data: forbidden
+    configuration_files: forbidden
+    processing_scripts: forbidden
+    reconstruction_instructions: forbidden
+  reason: Unknown datasets are non-public by default.
+
+datasets:
+  adni:
+    display_name: ADNI
+    aliases:
+      - ADNI
+    participant_level_release: forbidden
+    final_approval_status: not_approved
+    approval_reference: approvals.datasets.adni
+    decisions:
+      participant_level_connectomes: forbidden
+      participant_level_metadata: forbidden
+      exact_split_membership: forbidden
+      aggregate_metrics: allowed_if_explicitly_allowlisted_and_reviewed
+      statistical_summaries: allowed_if_explicitly_allowlisted_and_reviewed
+      figure_source_data: allowed_if_explicitly_allowlisted_and_reviewed
+      configuration_files: allowed_if_explicitly_allowlisted_and_reviewed
+      processing_scripts: allowed_if_explicitly_allowlisted_and_reviewed
+      reconstruction_instructions: allowed_if_explicitly_allowlisted_and_reviewed
+    restricted_reconstruction_required: true
+
+  adnidod:
+    display_name: ADNI-DOD
+    aliases:
+      - ADNIDOD
+      - ADNI-DOD
+    participant_level_release: forbidden
+    final_approval_status: not_approved
+    approval_reference: approvals.datasets.adnidod
+    decisions:
+      participant_level_connectomes: forbidden
+      participant_level_metadata: forbidden
+      exact_split_membership: forbidden
+      aggregate_metrics: allowed_if_explicitly_allowlisted_and_reviewed
+      statistical_summaries: allowed_if_explicitly_allowlisted_and_reviewed
+      figure_source_data: allowed_if_explicitly_allowlisted_and_reviewed
+      configuration_files: allowed_if_explicitly_allowlisted_and_reviewed
+      processing_scripts: allowed_if_explicitly_allowlisted_and_reviewed
+      reconstruction_instructions: allowed_if_explicitly_allowlisted_and_reviewed
+    restricted_reconstruction_required: true
+
+  oasis3:
+    display_name: OASIS-3
+    aliases:
+      - OASIS3
+      - OASIS-3
+    participant_level_release: forbidden
+    final_approval_status: not_approved
+    approval_reference: approvals.datasets.oasis3
+    decisions:
+      participant_level_connectomes: forbidden
+      participant_level_metadata: forbidden
+      exact_split_membership: forbidden
+      aggregate_metrics: allowed_if_explicitly_allowlisted_and_reviewed
+      statistical_summaries: allowed_if_explicitly_allowlisted_and_reviewed
+      figure_source_data: allowed_if_explicitly_allowlisted_and_reviewed
+      configuration_files: allowed_if_explicitly_allowlisted_and_reviewed
+      processing_scripts: allowed_if_explicitly_allowlisted_and_reviewed
+      reconstruction_instructions: allowed_if_explicitly_allowlisted_and_reviewed
+    restricted_reconstruction_required: true
+
+  abide:
+    display_name: ABIDE
+    aliases:
+      - ABIDE
+    participant_level_release: allowed
+    participant_level_connectomes:
+      status: allowed
+      license:
+        type: ABIDE_source_license
+      confirmation:
+        available: true
+      allowed_metadata: []
+      prohibited:
+        - raw_images
+        - T1w_images
+        - original_source_paths
+        - original_identifiers
+        - unrestricted_clinical_text
+        - arbitrary_behavioural_variables
+        - questionnaire_responses
+      required_conditions:
+        - attribution
+        - non_commercial_use
+        - share_alike_if_required
+      required_citation:
+        - ABIDE_reference
+        - INDI_reference
+    final_approval_status: permission_confirmed_artifact_binding_required
+    approval_reference: approvals.datasets.abide
+    decisions:
+      participant_level_connectomes: allowed_with_confirmed_terms_and_source_binding
+      participant_level_metadata: allowed_with_confirmed_terms_source_binding_and_allowlist
+      exact_split_membership: forbidden
+      aggregate_metrics: allowed_if_explicitly_allowlisted_and_reviewed
+      statistical_summaries: allowed_if_explicitly_allowlisted_and_reviewed
+      figure_source_data: allowed_if_explicitly_allowlisted_and_reviewed
+      configuration_files: allowed_if_explicitly_allowlisted_and_reviewed
+      processing_scripts: allowed_if_explicitly_allowlisted_and_reviewed
+      reconstruction_instructions: allowed_if_explicitly_allowlisted_and_reviewed
+    restricted_reconstruction_required_until_approved: true
+
+  cobre:
+    display_name: COBRE
+    aliases:
+      - COBRE
+    participant_level_release: allowed
+    participant_level_connectomes:
+      status: allowed
+      license:
+        type: COBRE_confirmed_license
+      confirmation:
+        available: true
+      allowed_metadata: []
+      prohibited:
+        - raw_images
+        - T1w_images
+        - original_source_paths
+        - original_identifiers
+        - unrestricted_clinical_text
+        - arbitrary_behavioural_variables
+        - questionnaire_responses
+      required_conditions:
+        - confirmed_cobre_fcp_redistribution_terms
+        - attribution
+        - non_commercial_use
+      required_citation:
+        - COBRE_reference
+        - FCP_INDI_reference
+    final_approval_status: permission_confirmed_artifact_binding_required
+    approval_reference: approvals.datasets.cobre
+    decisions:
+      participant_level_connectomes: allowed_with_confirmed_terms_and_source_binding
+      participant_level_metadata: allowed_with_confirmed_terms_source_binding_and_allowlist
+      exact_split_membership: forbidden
+      aggregate_metrics: allowed_if_explicitly_allowlisted_and_reviewed
+      statistical_summaries: allowed_if_explicitly_allowlisted_and_reviewed
+      figure_source_data: allowed_if_explicitly_allowlisted_and_reviewed
+      configuration_files: allowed_if_explicitly_allowlisted_and_reviewed
+      processing_scripts: allowed_if_explicitly_allowlisted_and_reviewed
+      reconstruction_instructions: allowed_if_explicitly_allowlisted_and_reviewed
+    restricted_reconstruction_required_until_approved: true
+
+  camcan:
+    display_name: Cam-CAN
+    aliases:
+      - CamCAN
+      - Cam-CAN
+    participant_level_release: allowed
+    participant_level_connectomes:
+      status: allowed
+      license:
+        type: CC-BY-4.0
+      confirmation:
+        available: true
+      allowed_metadata:
+        - age
+        - sex
+      prohibited:
+        - raw_images
+        - raw_T1_images
+        - T1w_images
+        - identifiable_images
+        - home_interview_variables
+        - identifiable_behavioural_variables
+        - CCID
+      required_conditions:
+        - attribution
+        - exclude_identifiable_material
+        - limit_metadata_to_age_and_sex
+      required_citation:
+        - Shafto_et_al_CamCAN_cohort_paper
+    final_approval_status: permission_confirmed_artifact_binding_required
+    approval_reference: approvals.datasets.camcan
+    decisions:
+      participant_level_connectomes: allowed_with_confirmed_terms_and_source_binding
+      participant_level_metadata: allowed_with_confirmed_terms_source_binding_and_allowlist
+      exact_split_membership: forbidden
+      aggregate_metrics: allowed_if_explicitly_allowlisted_and_reviewed
+      statistical_summaries: allowed_if_explicitly_allowlisted_and_reviewed
+      figure_source_data: allowed_if_explicitly_allowlisted_and_reviewed
+      configuration_files: allowed_if_explicitly_allowlisted_and_reviewed
+      processing_scripts: allowed_if_explicitly_allowlisted_and_reviewed
+      reconstruction_instructions: allowed_if_explicitly_allowlisted_and_reviewed
+    restricted_reconstruction_required_until_approved: true
+
+  1000brains:
+    display_name: 1000BRAINS
+    aliases:
+      - 1000BRAINS
+    participant_level_release: forbidden_unless_explicitly_approved
+    final_approval_status: not_approved
+    approval_reference: approvals.datasets.1000brains
+    explicit_policy_change_required: true
+    decisions:
+      participant_level_connectomes: forbidden_unless_explicitly_approved_and_allowlisted
+      participant_level_metadata: forbidden_unless_explicitly_approved_and_allowlisted
+      exact_split_membership: forbidden_unless_explicitly_approved_and_allowlisted
+      aggregate_metrics: requires_manual_approval_and_allowlist
+      statistical_summaries: requires_manual_approval_and_allowlist
+      figure_source_data: requires_manual_approval_and_allowlist
+      configuration_files: requires_manual_approval_and_allowlist
+      processing_scripts: allowed_if_explicitly_allowlisted_and_reviewed
+      reconstruction_instructions: requires_manual_approval_and_allowlist
+
+approval_semantics:
+  approval_file: configs/release/manual_approvals.yaml
+  recognized_status: approved
+  required_fields:
+    - approved_by
+    - approved_on
+    - scope
+    - evidence
+  empty_or_missing_fields_invalidate_approval: true
+  approval_never_overrides_forbidden_policy: true
+  policy_change_and_approval_both_required_for_forbidden_unless_explicitly_approved: true

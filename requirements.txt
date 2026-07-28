@@ -1,5 +1,5 @@
 # Python 3.11 validation environment.
-# These are pinned direct dependencies used by the benchmark smoke tests.
+# Pinned direct runtime, preparation, and plotting dependencies.
 
 spd-learn==0.1.0
 
@@ -20,5 +20,4 @@ nibabel==5.4.2
 matplotlib==3.10.9
 seaborn==0.13.2
 tabulate==0.10.0
-
-pytest==9.0.3
+PyYAML==6.0.2

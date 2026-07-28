@@ -19,9 +19,10 @@ from spd_connectome_benchmark.analysis_outputs.result_io import (
     build_all_age_points_df_variant,
     build_csv_map_from_results,
 )
-from spd_connectome_benchmark.analysis_outputs.result_plotting import (
-    plot_all_age_box_grid,
+from spd_connectome_benchmark.analysis_outputs.result_grid_plots import (
     plot_all_age_box_grid_wrapped,
+)
+from spd_connectome_benchmark.analysis_outputs.result_plotting import (
     plot_paper_style_box_row,
     plot_paper_style_box_row_metric,
 )

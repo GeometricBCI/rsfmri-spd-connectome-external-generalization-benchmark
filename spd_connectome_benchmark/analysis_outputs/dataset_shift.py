@@ -1,5 +1,7 @@
 """Generate descriptive dataset-shift figures used by Paper Figure 2."""
 
+from __future__ import annotations
+
 import argparse
 import pickle
 from pathlib import Path
@@ -137,18 +139,6 @@ def _format_diag_label(label: str) -> str:
     if label in cdr_label_map:
         return cdr_label_map[label]
     return label
-
-
-def _should_use_external_diag_label(dataset: str, label: str, value: float) -> bool:
-    dataset_name = str(dataset).strip().lower()
-    text = str(label).strip()
-    if value <= 0:
-        return False
-    if dataset_name == "adni" and text in {"SMC", "AD"}:
-        return False
-    if dataset_name == "oasis3":
-        return False
-    return value < 0.11
 
 
 def _diagnosis_progression_sort_key(label: str) -> tuple[int, str]:

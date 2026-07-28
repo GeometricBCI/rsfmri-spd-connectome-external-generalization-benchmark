@@ -1,0 +1,172 @@
+schema_version: 1
+
+scanner:
+  default_decision_on_error: reject
+  scan_filenames: true
+  scan_text_content: true
+  report_line_numbers_when_available: true
+  include_full_sensitive_match_in_report: false
+  text_extensions:
+    - .md
+    - .txt
+    - .tsv
+    - .csv
+    - .json
+    - .yaml
+    - .yml
+    - .cff
+    - .py
+    - .sh
+
+redaction:
+  prefix_characters: 3
+  suffix_characters: 2
+  replacement: "[REDACTED]"
+
+forbidden_extensions:
+  - .pkl
+  - .pickle
+  - .npy
+  - .nii
+  - .nii.gz
+  - .dcm
+  - .dicom
+  - .ima
+  - .mnc
+  - .mgz
+  - .mgh
+  - .nrrd
+  - .hdr
+  - .img
+  - .pt
+  - .pth
+  - .ckpt
+
+forbidden_path_components:
+  - sourcedata
+  - derivatives
+  - raw_data
+  - local_data
+  - harmonized_spd
+  - harmonized_features
+  - __pycache__
+  - .git
+
+forbidden_filename_patterns:
+  - id: bids_subject
+    regex: '(?i)(^|[/\\])sub-[A-Za-z0-9]+'
+  - id: bids_session
+    regex: '(?i)(^|[/\\])ses-[A-Za-z0-9]+'
+  - id: participant_table
+    regex: '(?i)(^|[/\\])participants\.(tsv|json)$'
+  - id: participant_pickle
+    regex: '(?i)_X_y\.(pkl|pickle)$'
+  - id: scan_session_event_table
+    regex: '(?i)_(scans|sessions|events)\.tsv$'
+  - id: raw_t1_image
+    category: identifiable_image
+    regex: '(?i)(^|[/\\])[^/\\]*(?:T1w|T1[-_ ]weighted|MPRAGE)[^/\\]*\.(?:nii(?:\.gz)?|dcm|dicom|ima|mnc|mgz|mgh|nrrd|hdr|img)$'
+  - id: home_interview_file
+    category: identifiable_behavioural_variable
+    regex: '(?i)(^|[/\\])[^/\\]*home[-_ ]?interview[^/\\]*\.(?:csv|tsv|json|xlsx?)$'
+  - id: questionnaire_file
+    category: unapproved_behavioural_variable
+    regex: '(?i)(^|[/\\])[^/\\]*(?:questionnaire|survey|behaviou?ral)[^/\\]*\.(?:csv|tsv|json|xlsx?)$'
+
+forbidden_text_patterns:
+  - id: absolute_posix_path
+    category: local_path
+    regex: '(?<![A-Za-z0-9:])/(?:Users|home|private|Volumes|mnt|scratch|tmp|var|opt)/[^\s"''<>]+'
+  - id: absolute_windows_path
+    category: local_path
+    regex: '(?i)\b[A-Z]:\\(?:[^\\\r\n]+\\)+[^\\\r\n]*'
+  - id: home_directory_reference
+    category: local_path
+    regex: '(?i)(?:~[/\\]|\$(?:HOME|USERPROFILE)\b|%(?:USERPROFILE)%)'
+  - id: email_address
+    category: contact_information
+    regex: '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
+  - id: adni_style_identifier
+    category: participant_identifier
+    regex: '\b[0-9]{3}_S_[0-9]{4}\b'
+  - id: bids_subject_identifier
+    category: participant_identifier
+    regex: '(?i)\bsub-[A-Za-z0-9]+\b'
+  - id: bids_session_identifier
+    category: participant_identifier
+    regex: '(?i)\bses-[A-Za-z0-9]+\b'
+  - id: original_neuroimaging_filename
+    category: source_filename
+    regex: '(?i)\b[^\s/\\]+\.(?:nii(?:\.gz)?|dcm|ima|pkl|pickle)\b'
+  - id: github_personal_access_token
+    category: credential
+    regex: '\b(?:ghp|github_pat)_[A-Za-z0-9_]{20,}\b'
+  - id: jwt_token
+    category: credential
+    regex: '\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b'
+  - id: generic_secret_assignment
+    category: credential
+    regex: '(?i)\b(?:api[_-]?key|access[_-]?token|client[_-]?secret|password)\s*[:=]\s*["'']?[A-Za-z0-9_./+=-]{8,}'
+  - id: aws_access_key
+    category: credential
+    regex: '\bAKIA[0-9A-Z]{16}\b'
+
+forbidden_tabular_columns:
+  exact:
+    - participant_id
+    - subject_id
+    - subjectid
+    - scan_id
+    - session_id
+    - visit_id
+    - image_id
+    - original_filename
+    - file_path
+    - source_path
+    - acquisition_date
+    - birth_date
+    - clinical_notes
+    - clinical_text
+    - unrestricted_clinical_text
+    - free_text
+    - open_text
+    - comments
+    - home_interview
+    - home_interview_variables
+    - questionnaire
+    - questionnaire_response
+    - questionnaire_responses
+    - survey_item
+    - survey_response
+    - behavioral_measure
+    - behavioral_variables
+    - behavioural_measure
+    - behavioural_variables
+    - input_path
+    - local_path
+    - raw_filename
+    - source_filename
+  regex:
+    - '(?i)(^|_)(participant|subject|scan|session|visit|image)(_?id)?($|_)'
+    - '(?i)(^|_)(original_?filename|file_?path|source_?path)($|_)'
+    - '(?i)(^|_)(acquisition_?date|birth_?date|clinical_?notes|free_?text)($|_)'
+    - '(?i)(^|_)(comments?|open_?text|clinical_?text)($|_)'
+    - '(?i)(^|_)home_?interview($|_)'
+    - '(?i)(^|_)(questionnaire|survey)($|_)'
+    - '(?i)(^|_)(behaviou?r|behaviou?ral)($|_)'
+    - '(?i)(^|_)(input|local|raw|source)_?(file_?name|path)($|_)'
+
+approved_contexts:
+  email_addresses: []
+  local_paths: []
+  credentials: []
+
+reporting:
+  redact_sensitive_matches: true
+  report_fields:
+    - rule_id
+    - category
+    - relative_path
+    - line_number
+    - redacted_match
+    - decision
