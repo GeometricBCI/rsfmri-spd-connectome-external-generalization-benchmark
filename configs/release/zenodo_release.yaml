@@ -1,0 +1,278 @@
+schema_version: 1
+
+project:
+  title: "Benchmarking External Generalization of SPD Matrix Learning for Resting-State fMRI Connectome Prediction"
+  version: "0.1.0"
+  resource_type: dataset
+  repository_url: "https://github.com/GeometricBCI/rsfmri-spd-connectome-external-generalization-benchmark"
+  version_source: pyproject.toml
+
+release:
+  archive_basename: spd_connectome_benchmark_v0.1.0
+  archive_format: zip
+  atlas: schaefer_100
+  expected_regions: 100
+  matrix_type: correlation
+  positive_definite_required: true
+  numeric_dtype_allowlist:
+    - float32
+    - float64
+  symmetry_tolerance: 1.0e-6
+  diagonal_expected: 1.0
+  diagonal_tolerance: 1.0e-4
+  spd_eigenvalue_tolerance: 1.0e-10
+  normalized_archive_timestamp: "1980-01-01T00:00:00Z"
+  test_only: false
+  version_confirmed: false
+  publication_ready: false
+  publication_gate: manual_required
+
+restricted_reconstruction:
+  task: regression
+  target: Age
+  grouping_rule: keep every scan from one non-public subject group in one fold
+  outer_cv_protocols:
+    - subject_grouped_kfold
+    - leave_one_dataset_out
+  kfold_n_splits: 5
+  model_seed: 1
+  data_shuffle_seed: 42
+  dataset_reviews:
+    adni:
+      selection_rules_reference: prepare_fmri_datasets.py
+      selection_rules_reviewed: false
+      aggregate_fold_counts: []
+    adnidod:
+      selection_rules_reference: prepare_fmri_datasets.py
+      selection_rules_reviewed: false
+      aggregate_fold_counts: []
+    oasis3:
+      selection_rules_reference: prepare_fmri_datasets.py
+      selection_rules_reviewed: false
+      aggregate_fold_counts: []
+
+paths:
+  dataset_policy: dataset_release_policy.yaml
+  metadata_allowlist: metadata_allowlist.yaml
+  forbidden_patterns: forbidden_patterns.yaml
+  manual_approvals: manual_approvals.yaml
+  release_templates: ../../release_templates
+  safe_export_dir: null
+  output_dir: zenodo_upload
+  staging_subdir: staging
+  upload_subdir: upload_files
+  reports_subdir: reports
+
+metadata:
+  creators:
+    - name: Ce Ju
+      affiliation: Inria
+  keywords:
+    - resting-state fMRI
+    - connectome
+    - symmetric positive-definite matrices
+    - external generalization
+    - age regression
+  description: >-
+    Frozen, versioned research materials for the manuscript “Benchmarking
+    External Generalization of SPD Matrix Learning for Resting-State fMRI
+    Connectome Prediction,” limited to artifacts that pass the repository's
+    explicit redistribution, privacy, provenance, and format policies.
+  licenses:
+    source_code:
+      identifier: BSD-3-Clause
+      status: documented_in_repository
+      evidence: LICENSE
+    derived_data:
+      identifier: null
+      status: dataset_specific_rights_confirmed_record_level_review_required
+      evidence: metadata.dataset_rights
+    documentation:
+      identifier: null
+      status: manual_required
+      evidence: null
+  dataset_rights:
+    camcan:
+      status: approved_derived_data_release
+      license: CC-BY-4.0
+      conditions:
+        - attribution
+        - exclude_identifiable_material
+        - limit_metadata_to_age_and_sex
+      required_citations:
+        - Shafto_et_al_CamCAN_cohort_paper
+      rights_statement: >-
+        Approved derived-data release of participant-level functional-connectivity
+        matrices under CC-BY-4.0; raw or identifiable images, T1-weighted images,
+        Home Interview variables, and identifiable behavioural variables are excluded.
+    abide:
+      status: approved_derived_data_release
+      license: ABIDE_source_license
+      conditions:
+        - attribution
+        - non_commercial_use
+        - share_alike_if_required
+      required_citations:
+        - ABIDE_reference
+        - INDI_reference
+      rights_statement: >-
+        Approved derived-data release of participant-level functional-connectivity
+        matrices under the confirmed ABIDE source-data terms, retaining attribution,
+        non-commercial-use, and applicable share-alike conditions.
+    cobre:
+      status: approved_derived_data_release
+      license: COBRE_confirmed_license
+      conditions:
+        - confirmed_cobre_fcp_redistribution_terms
+        - attribution
+        - non_commercial_use
+      required_citations:
+        - COBRE_reference
+        - FCP_INDI_reference
+      rights_statement: >-
+        Approved derived-data release of participant-level functional-connectivity
+        matrices under the confirmed COBRE/FCP redistribution terms, including
+        attribution and non-commercial-use conditions.
+  related_identifiers: []
+  funding: []
+  manuscript_doi: null
+  required_manual_fields:
+    - creators
+    - creator_order
+    - creator_affiliations
+    - creator_orcids_if_authoritatively_available
+    - zenodo_record_level_mixed_license_choice
+    - documentation_license
+    - abide_exact_source_license_title_version_and_uri
+    - cobre_exact_redistribution_terms_title_version_and_uri
+    - abide_indi_complete_citation_text
+    - cobre_fcp_indi_complete_citation_text
+    - manuscript_doi_or_explicit_absence
+    - related_identifiers
+    - funding_or_explicit_none
+
+content_allowlist:
+  default_decision: deny
+  unknown_dataset_decision: deny
+  unknown_content_category_decision: deny
+  categories:
+    participant_level_connectomes:
+      allowed_extensions:
+        - .npz
+      requires_dataset_approval: true
+      requires_metadata_allowlist: true
+      allow_pickle: false
+    participant_level_metadata:
+      allowed_extensions:
+        - .tsv
+        - .csv
+      requires_dataset_approval: true
+      requires_metadata_allowlist: true
+    exact_split_membership:
+      allowed_extensions:
+        - .tsv
+        - .csv
+      requires_dataset_approval: true
+      requires_release_safe_sample_uid: true
+    aggregate_metrics:
+      allowed_extensions:
+        - .tsv
+        - .csv
+        - .json
+      requires_artifact_review: true
+    statistical_summaries:
+      allowed_extensions:
+        - .tsv
+        - .csv
+        - .json
+      requires_artifact_review: true
+    figure_source_data:
+      allowed_extensions:
+        - .tsv
+        - .csv
+        - .json
+      requires_artifact_review: true
+    configuration_files:
+      allowed_extensions:
+        - .yaml
+        - .yml
+        - .json
+      requires_artifact_review: true
+    processing_scripts:
+      allowed_extensions:
+        - .py
+        - .sh
+      requires_artifact_review: true
+    reconstruction_instructions:
+      allowed_extensions:
+        - .md
+        - .txt
+        - .yaml
+        - .yml
+      requires_artifact_review: true
+    reproducibility_metadata:
+      allowed_extensions:
+        - .json
+        - .yaml
+        - .yml
+        - .tsv
+        - .txt
+        - .md
+      requires_artifact_review: true
+    release_documentation:
+      allowed_extensions:
+        - .md
+        - .txt
+        - .cff
+      requires_artifact_review: true
+  always_forbidden_extensions:
+    - .pkl
+    - .pickle
+    - .npy
+    - .nii
+    - .nii.gz
+    - .dcm
+    - .dicom
+    - .ima
+    - .mnc
+    - .mgz
+    - .mgh
+    - .nrrd
+    - .hdr
+    - .img
+    - .pt
+    - .pth
+    - .ckpt
+  excluded_from_upload:
+    - synthetic_test_fixtures
+    - validation_scratch_files
+    - caches
+    - trusted_internal_inputs
+    - safe_export_working_directory
+
+safe_export_contract:
+  input_must_be_designated_directory: true
+  input_manifest_required: true
+  unknown_files: reject
+  unknown_fields: reject
+  symbolic_links: reject
+  copy_original_filenames: false
+  copy_source_paths: false
+  hashed_original_identifiers: forbidden
+  sample_uid_generation: only_when_confirmed_dataset_policy_and_artifact_binding_permit
+  npz_allow_pickle: false
+  finite_numeric_arrays_required: true
+
+publication_requirements:
+  require_complete_manual_approvals: true
+  require_complete_required_metadata: true
+  require_dataset_specific_rights_statements: true
+  require_mixed_record_license_review: true
+  require_explicit_documentation_license: true
+  require_clean_validation_report: true
+  require_manifest_match: true
+  require_checksum_match: true
+  require_revalidated_archive: true
+  allow_zenodo_api: false
+  allow_token_access: false
+  allow_doi_reservation: false

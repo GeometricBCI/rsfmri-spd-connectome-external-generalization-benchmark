@@ -1,0 +1,237 @@
+schema_version: 1
+
+approval_protocol:
+  default_status: manual_required
+  recognized_approved_status: approved
+  designated_reviewer: Ce Ju
+  designation_confirmed_on: "2026-07-27"
+  required_fields_for_approval:
+    - approved_by
+    - approved_on
+    - scope
+    - evidence
+  null_or_empty_required_field_invalidates_approval: true
+  approval_does_not_override_forbidden_policy: true
+  deliberate_confirmation_required: true
+  required_confirmation_text: >-
+    I reviewed the stated scope, governing terms, privacy risk, and evidence,
+    and authorize only the explicitly described public-release materials.
+
+publication_gate:
+  status: manual_required
+  publish_ready: false
+  approved_by: null
+  approved_on: null
+  scope: null
+  evidence: null
+  confirmation: null
+
+approvals:
+  datasets:
+    adni:
+      required: true
+      status: manual_required
+      policy_ceiling: aggregate_allowlisted_outputs_and_reconstruction_only
+      dataset: adni
+      atlas: null
+      n_regions: null
+      source_binding_sha256: null
+      approved_by: null
+      approved_on: null
+      scope: null
+      evidence: null
+      confirmation: null
+    adnidod:
+      required: true
+      status: manual_required
+      policy_ceiling: aggregate_allowlisted_outputs_and_reconstruction_only
+      dataset: adnidod
+      atlas: null
+      n_regions: null
+      source_binding_sha256: null
+      approved_by: null
+      approved_on: null
+      scope: null
+      evidence: null
+      confirmation: null
+    oasis3:
+      required: true
+      status: manual_required
+      policy_ceiling: aggregate_allowlisted_outputs_and_reconstruction_only
+      dataset: oasis3
+      atlas: null
+      n_regions: null
+      source_binding_sha256: null
+      approved_by: null
+      approved_on: null
+      scope: null
+      evidence: null
+      confirmation: null
+    abide:
+      required: true
+      status: permission_confirmed_artifact_binding_required
+      policy_ceiling: confirmed_connectomes_and_release_safe_metadata_only
+      dataset: abide
+      atlas: schaefer_100
+      n_regions: 100
+      source_binding_sha256: null
+      license_identifier: ABIDE_source_license
+      evidence_candidate: project-held official ABIDE redistribution confirmation
+      approved_by: null
+      approved_on: null
+      scope:
+        - participant_connectomes
+        - participant_metadata
+      evidence: null
+      confirmation: null
+    cobre:
+      required: true
+      status: permission_confirmed_artifact_binding_required
+      policy_ceiling: confirmed_connectomes_and_release_safe_metadata_only
+      dataset: cobre
+      atlas: schaefer_100
+      n_regions: 100
+      source_binding_sha256: null
+      license_identifier: COBRE_confirmed_license
+      evidence_candidate: project-held official COBRE/FCP redistribution confirmation
+      approved_by: null
+      approved_on: null
+      scope:
+        - participant_connectomes
+        - participant_metadata
+      evidence: null
+      confirmation: null
+    camcan:
+      required: true
+      status: permission_confirmed_artifact_binding_required
+      policy_ceiling: camcan_connectomes_and_age_sex_metadata_only
+      dataset: camcan
+      atlas: schaefer_100
+      n_regions: 100
+      source_binding_sha256: null
+      license_identifier: CC-BY-4.0
+      evidence_candidate: project-held official CamCAN redistribution confirmation
+      approved_by: null
+      approved_on: null
+      scope:
+        - participant_connectomes
+        - participant_metadata
+      evidence: null
+      confirmation: null
+    1000brains:
+      required: true
+      status: manual_required
+      policy_ceiling: forbidden_until_policy_is_deliberately_changed
+      dataset: 1000brains
+      atlas: null
+      n_regions: null
+      source_binding_sha256: null
+      approved_by: null
+      approved_on: null
+      scope: null
+      evidence: null
+      confirmation: null
+
+  licenses:
+    source_code:
+      status: manual_required
+      documented_identifier: BSD-3-Clause
+      evidence_candidate: LICENSE
+      approved_by: null
+      approved_on: null
+      scope: null
+      evidence: null
+      confirmation: null
+    derived_data:
+      status: dataset_specific_rights_confirmed_record_level_review_required
+      license_identifier: null
+      approved_by: null
+      approved_on: null
+      scope: null
+      evidence: null
+      confirmation: null
+    documentation:
+      status: manual_required
+      license_identifier: null
+      approved_by: null
+      approved_on: null
+      scope: null
+      evidence: null
+      confirmation: null
+
+  zenodo_metadata:
+    creators_and_order:
+      status: manual_required
+      approved_by: null
+      approved_on: null
+      scope: null
+      evidence: null
+      confirmation: null
+    affiliations_and_orcids:
+      status: manual_required
+      approved_by: null
+      approved_on: null
+      scope: null
+      evidence: null
+      confirmation: null
+    funding:
+      status: manual_required
+      approved_by: null
+      approved_on: null
+      scope: null
+      evidence: null
+      confirmation: null
+    related_identifiers_and_manuscript_doi:
+      status: manual_required
+      approved_by: null
+      approved_on: null
+      scope: null
+      evidence: null
+      confirmation: null
+
+  release_artifacts:
+    aggregate_results_content_and_pdf_metadata_review:
+      status: manual_required
+      reviewed_artifacts: []
+      approved_by: null
+      approved_on: null
+      scope: null
+      evidence: null
+      confirmation: null
+    privacy_scan_review:
+      status: manual_required
+      approved_by: null
+      approved_on: null
+      scope: null
+      evidence: null
+      confirmation: null
+    manifest_and_checksum_review:
+      status: manual_required
+      approved_by: null
+      approved_on: null
+      scope: null
+      evidence: null
+      confirmation: null
+    final_zenodo_form_review:
+      status: manual_required
+      approved_by: null
+      approved_on: null
+      scope: null
+      evidence: null
+      confirmation: null
+
+manual_action_items:
+  - Confirm the complete creator list and creator order from an authoritative manuscript record.
+  - Confirm affiliations and add ORCIDs only when authoritatively documented.
+  - Confirm funding or explicitly record that there is none.
+  - Confirm the manuscript DOI and related identifiers, or explicitly record their absence.
+  - Confirm source-code and documentation license scopes.
+  - Confirm how Zenodo should display the mixed dataset-specific rights without
+    replacing CamCAN, ABIDE, or COBRE terms with one global data license.
+  - Record the exact ABIDE and COBRE license title/version and complete required
+    citation text from the authoritative confirmations.
+  - Bind the confirmed CamCAN, ABIDE, and COBRE permissions to an authorized
+    reviewer, ISO review date, non-sensitive evidence reference, and each exact
+    safe-export source binding.
+  - Review every aggregate result and all PDF metadata before safe export.
+  - Review the final privacy, manifest, checksum, archive-revalidation, and Zenodo-form reports.

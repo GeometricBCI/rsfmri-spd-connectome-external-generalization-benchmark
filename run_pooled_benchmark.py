@@ -36,11 +36,13 @@ from spd_connectome_benchmark.connectomes import (
     vectorize_correlation_upper,
 )
 from spd_connectome_benchmark.models.spd import SPDNetRegressor
+from spd_connectome_benchmark.protocols import harmonization_policy
 from spd_connectome_benchmark.benchmark_tools.runtime import (
     EarlyStopping,
     MatrixRegressionDataset,
     append_fold_metrics,
     compute_age_regression_metrics,
+    ensure_nonempty_training_batches,
     evaluate_regression_model,
     format_metrics_for_log,
     init_fold_metrics,
@@ -49,7 +51,9 @@ from spd_connectome_benchmark.benchmark_tools.runtime import (
     make_lodo_splits,
     save_protocol_metrics_csv,
     select_metrics_for_protocol,
+    set_global_random_seed,
     split_train_validation_by_group,
+    timestamp_tag,
 )
 from spd_connectome_benchmark.benchmark_tools.harmonization import (
     load_or_harmonize_features,
@@ -107,6 +111,11 @@ def train_spdnet_fold(
     test_dataset = MatrixRegressionDataset(
         torch.from_numpy(X_te).float(),
         torch.from_numpy(y_te).float(),
+    )
+    ensure_nonempty_training_batches(
+        len(train_dataset),
+        args.train_batch_size,
+        drop_last=True,
     )
 
     train_loader = DataLoader(
@@ -562,7 +571,9 @@ def run_pooled_age_benchmarks(
     os.makedirs(args.weights_folder_path, exist_ok=True)
 
     # Original behavior: do not add an extra fold-specific DataLoader seed here.
-    rng = np.random.RandomState(rng_seed)
+    # The run-level seed now controls model initialization, dropout, and the
+    # ambient DataLoader shuffle stream; fold-specific reseeding is unchanged.
+    set_global_random_seed(args.seed)
 
     device = resolve_torch_device(args.no_cuda)
     print("Using device:", device)
@@ -589,7 +600,7 @@ def run_pooled_age_benchmarks(
     else:
         tag = "ALL"
 
-    timestamp = time.strftime("[%Y-%m-%d %H:%M:%S]", time.localtime())
+    timestamp = f"[{timestamp_tag()}]"
     algos = {a.lower() for a in algorithms}
 
     protocol_choice = args.protocol.lower()
@@ -612,7 +623,7 @@ def run_pooled_age_benchmarks(
                 subject_ids,
                 dataset_ids,
                 args.harm_mode,
-                apply_harm_to_test=True,
+                apply_harm_to_test=harmonization_policy("kfold").apply_to_test,
             )
         if "ridge" in algos:
             _ = _run_tangent_space_ridge(
@@ -624,7 +635,7 @@ def run_pooled_age_benchmarks(
                 subject_ids,
                 dataset_ids,
                 args.harm_mode,
-                apply_harm_to_test=True,
+                apply_harm_to_test=harmonization_policy("kfold").apply_to_test,
             )
         if "corr_ridge" in algos:
             _ = _run_corrvec_ridge(
@@ -636,7 +647,7 @@ def run_pooled_age_benchmarks(
                 subject_ids,
                 dataset_ids,
                 args.harm_mode,
-                apply_harm_to_test=True,
+                apply_harm_to_test=harmonization_policy("kfold").apply_to_test,
             )
         if "dummy" in algos:
             _ = _run_dummy(protocol1, splits_gkf, fold_names_gkf, y, args.harm_mode)
@@ -659,7 +670,7 @@ def run_pooled_age_benchmarks(
                 subject_ids,
                 dataset_ids,
                 args.harm_mode,
-                apply_harm_to_test=False,
+                apply_harm_to_test=harmonization_policy("lodo").apply_to_test,
             )
         if "ridge" in algos:
             _ = _run_tangent_space_ridge(
@@ -671,7 +682,7 @@ def run_pooled_age_benchmarks(
                 subject_ids,
                 dataset_ids,
                 args.harm_mode,
-                apply_harm_to_test=False,
+                apply_harm_to_test=harmonization_policy("lodo").apply_to_test,
             )
         if "corr_ridge" in algos:
             _ = _run_corrvec_ridge(
@@ -683,7 +694,7 @@ def run_pooled_age_benchmarks(
                 subject_ids,
                 dataset_ids,
                 args.harm_mode,
-                apply_harm_to_test=False,
+                apply_harm_to_test=harmonization_policy("lodo").apply_to_test,
             )
         if "dummy" in algos:
             _ = _run_dummy(protocol2, splits_lodo, fold_names_lodo, y, args.harm_mode)

@@ -14,17 +14,20 @@ from spd_connectome_benchmark.analysis_outputs.result_io import (
     build_long_df,
     build_long_df_metric,
 )
-from spd_connectome_benchmark.analysis_outputs.result_grid_plots import (
-    plot_all_age_avg_bar,
-    plot_all_age_box,
-    plot_all_age_box_grid,
-    plot_all_age_box_grid_wrapped,
-)
 from spd_connectome_benchmark.analysis_outputs.plot_style import (
-    align_strip_points_to_box_centers as _align_strip_points_to_box_centers,
-    compress_hue_offsets as _compress_hue_offsets,
     rename_legend_labels as _rename_legend_labels,
 )
+
+
+def _seeded_stripplot(*, seed: int, **kwargs):
+    """Draw a strip plot deterministically without changing global RNG state."""
+    random_state = np.random.get_state()
+    np.random.seed(seed)
+    try:
+        return sns.stripplot(**kwargs)
+    finally:
+        np.random.set_state(random_state)
+
 
 def plot_paper_style_box(
     csv_map,
@@ -81,8 +84,8 @@ def plot_paper_style_box(
     )
 
     if show_points:
-        rng = np.random.RandomState(seed)
-        sns.stripplot(
+        _seeded_stripplot(
+                    seed=seed,
                     data=df,
                     x="DatasetLabel",
                     y="NegMAE",
@@ -207,7 +210,8 @@ def plot_paper_style_box_row(
         )
 
         if show_points:
-            sns.stripplot(
+            _seeded_stripplot(
+                seed=seed,
                 data=df_ds,
                 x="DatasetLabel",
                 y="NegMAE",
@@ -322,7 +326,6 @@ def plot_paper_style_box_row_metric(
     if len(datasets) == 1:
         axes = [axes]
 
-    rng = np.random.RandomState(seed)
     for i, (ax, ds) in enumerate(zip(axes, datasets)):
         label = dataset_labels.get(ds, ds) if dataset_labels else ds
         df_ds = df[df["Dataset"] == ds]
@@ -342,7 +345,8 @@ def plot_paper_style_box_row_metric(
         )
 
         if show_points:
-            sns.stripplot(
+            _seeded_stripplot(
+                seed=seed,
                 data=df_ds,
                 x="DatasetLabel",
                 y="Value",

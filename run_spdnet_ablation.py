@@ -25,8 +25,6 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from pyriemann.tangentspace import TangentSpace
-
 from spd_connectome_benchmark.config import (
     DEFAULT_ABLATION_RESULTS_DIR,
     DEFAULT_ABLATION_WEIGHTS_DIR,
@@ -34,11 +32,13 @@ from spd_connectome_benchmark.config import (
 )
 from spd_connectome_benchmark.connectomes import estimate_connectome_matrices
 from spd_connectome_benchmark.models.spd import SPDNetRegressor
+from spd_connectome_benchmark.protocols import harmonization_policy
 from spd_connectome_benchmark.benchmark_tools.runtime import (
     EarlyStopping,
     MatrixRegressionDataset,
     append_fold_metrics,
     compute_age_regression_metrics,
+    ensure_nonempty_training_batches,
     evaluate_regression_model,
     format_metrics_for_log,
     init_fold_metrics,
@@ -47,7 +47,9 @@ from spd_connectome_benchmark.benchmark_tools.runtime import (
     make_lodo_splits,
     save_protocol_metrics_csv,
     select_metrics_for_protocol,
+    set_global_random_seed,
     split_train_validation_by_group,
+    timestamp_tag,
 )
 from spd_connectome_benchmark.benchmark_tools.cli import (
     add_common_data_args,
@@ -60,7 +62,9 @@ from spd_connectome_benchmark.benchmark_tools.cli import (
     add_spdnet_optimization_args,
     resolve_torch_device,
 )
-from spd_connectome_benchmark.benchmark_tools.harmonization import harmonize_tangent_features
+from spd_connectome_benchmark.benchmark_tools.harmonization import (
+    load_or_harmonize_spd_matrices,
+)
 from spd_connectome_benchmark.benchmark_tools.logging import configure_logging
 
 
@@ -74,14 +78,6 @@ SPDNET_VARIANT_ALIASES = {
     "two": "two",
     "2layer": "two",
 }
-LEGACY_VARIANT_ALIASES = {
-    "quarterdim": ("quarterdim",),
-    "halfdim": ("halfdim",),
-    "one": ("one", "base"),
-    "two": ("two", "2layer"),
-}
-
-
 def canonical_spdnet_variant(variant_name: str) -> str:
     """Return the paper label for an SPDNet ablation variant."""
     key = variant_name.lower()
@@ -129,6 +125,11 @@ def train_spdnet_ablation_fold(
     test_dataset = MatrixRegressionDataset(
         torch.from_numpy(X_te).float(),
         torch.from_numpy(y_te).float(),
+    )
+    ensure_nonempty_training_batches(
+        len(train_dataset),
+        args.train_batch_size,
+        drop_last=True,
     )
 
     train_loader = DataLoader(
@@ -279,137 +280,22 @@ def run_pooled_spdnet_ablation_benchmarks(
         legacy_fold_tags=(),
         cache_dirs=(),
     ):
-        Path(save_dir).mkdir(parents=True, exist_ok=True)
-        save_path = os.path.join(save_dir, f"{fold_tag}_harmonized_spd.npz")
-        search_dirs = []
-        for cache_dir in (save_dir, *cache_dirs):
-            if cache_dir and cache_dir not in search_dirs:
-                search_dirs.append(cache_dir)
-
-        def _candidate_paths(tag):
-            filename = f"{tag}_harmonized_spd.npz"
-            suffix = f"_{tag.split('_SPDNet_', 1)[1]}_harmonized_spd.npz"
-            candidates = []
-            for cache_dir in search_dirs:
-                cache_path = Path(cache_dir)
-                exact_path = cache_path / filename
-                if exact_path.exists():
-                    candidates.append(exact_path)
-                if cache_path.exists():
-                    candidates.extend(sorted(cache_path.glob(f"*{suffix}")))
-            unique_candidates = []
-            seen = set()
-            for path in candidates:
-                resolved = str(path)
-                if resolved in seen:
-                    continue
-                seen.add(resolved)
-                unique_candidates.append(path)
-            return unique_candidates
-
-        def _load_cached(cache_path):
-            cached = np.load(cache_path)
-            cached_train_idx = cached["train_idx"]
-            cached_test_idx = cached["test_idx"]
-            if not np.array_equal(cached_train_idx, train_idx) or not np.array_equal(
-                cached_test_idx,
-                test_idx,
-            ):
-                print("Skip mismatched harmonized SPD cache:", cache_path)
-                return None
-
-            X_h = X.copy()
-            X_h[cached_train_idx] = cached["X_tr"]
-            X_h[cached_test_idx] = cached["X_te"]
-            print("Loaded harmonized SPD cache:", cache_path)
-            return X_h
-
-        for candidate_path in _candidate_paths(fold_tag):
-            X_cached = _load_cached(candidate_path)
-            if X_cached is not None:
-                if Path(candidate_path) != Path(save_path):
-                    cached = np.load(candidate_path)
-                    np.savez_compressed(
-                        save_path,
-                        X_tr=cached["X_tr"],
-                        X_te=cached["X_te"],
-                        train_idx=cached["train_idx"],
-                        test_idx=cached["test_idx"],
-                        reference=cached["reference"],
-                    )
-                    print("Copied harmonized SPD cache to local shared cache:", save_path)
-                return X_cached
-
-        for legacy_fold_tag in legacy_fold_tags:
-            for legacy_path in _candidate_paths(legacy_fold_tag):
-                X_cached = _load_cached(legacy_path)
-                if X_cached is None:
-                    continue
-                cached = np.load(legacy_path)
-                np.savez_compressed(
-                    save_path,
-                    X_tr=cached["X_tr"],
-                    X_te=cached["X_te"],
-                    train_idx=cached["train_idx"],
-                    test_idx=cached["test_idx"],
-                    reference=cached["reference"],
-                )
-                print("Copied legacy harmonized SPD cache to shared cache:", save_path)
-                return X_cached
-
-        X_tr = X[train_idx]
-        X_te = X[test_idx]
-        y_tr = y[train_idx]
-        y_te = y[test_idx]
-
-        # Paper Methods 2.6: tangent reference is estimated on outer-train only.
-        ts = TangentSpace(metric=ts_metric, tsupdate=False)
-        Z_tr = ts.fit_transform(X_tr)
-        Z_te = ts.transform(X_te)
-
-        cov_train = np.stack([dataset_ids[train_idx], y_tr], axis=1)
-        cov_test = np.stack([dataset_ids[test_idx], y_te], axis=1)
-
-        Z_tr_h, Z_te_h = harmonize_tangent_features(
-            Z_tr,
-            Z_te,
-            cov_train,
-            cov_test,
-            apply_harm_to_test=apply_harm_to_test,
-        )
-
-        X_tr_h = ts.inverse_transform(Z_tr_h)
-        X_te_h = ts.inverse_transform(Z_te_h) if apply_harm_to_test else X_te
-
-        X_h = X.copy()
-        X_h[train_idx] = X_tr_h
-        X_h[test_idx] = X_te_h
-
-        np.savez_compressed(
-            save_path,
-            X_tr=X_tr_h,
-            X_te=X_te_h,
+        if legacy_fold_tags or cache_dirs:
+            print(
+                "Legacy/external harmonization cache directories are ignored; "
+                "only the signed cache under the current output directory is used."
+            )
+        return load_or_harmonize_spd_matrices(
+            X=X,
+            y=y,
+            dataset_ids=dataset_ids,
             train_idx=train_idx,
             test_idx=test_idx,
-            reference=ts.reference_,
+            apply_harm_to_test=apply_harm_to_test,
+            ts_metric=ts_metric,
+            save_dir=save_dir,
+            fold_tag=fold_tag,
         )
-        print("Saved harmonized SPD matrices:", save_path)
-        return X_h
-
-    def _load_harmonized_spd_cache(X, train_idx, test_idx, cache_path):
-        cached = np.load(cache_path)
-        cached_train_idx = cached["train_idx"]
-        cached_test_idx = cached["test_idx"]
-        if not np.array_equal(cached_train_idx, train_idx) or not np.array_equal(
-            cached_test_idx,
-            test_idx,
-        ):
-            raise ValueError(f"Harmonized SPD cache split mismatch: {cache_path}")
-
-        X_h = X.copy()
-        X_h[cached_train_idx] = cached["X_tr"]
-        X_h[cached_test_idx] = cached["X_te"]
-        return X_h
 
     def _build_harmonized_spd_cache(
         protocol_tag,
@@ -422,18 +308,13 @@ def run_pooled_spdnet_ablation_benchmarks(
         if args.harm_mode not in ("harm", "both"):
             return {}
 
-        cache_paths = {}
+        cache_tags = {}
         save_dir = os.path.join(args.results_folder, "harmonized_spd")
         cache_dirs = list(args.harmonized_spd_cache_dirs or [])
 
         print(f"[{protocol_tag}] Preparing shared harmonized SPD cache once per fold...")
         for kf_iter, (train_idx, test_idx) in enumerate(splits, start=1):
             fold_tag = f"{tag}_SPDNet_{protocol_tag}_fold{kf_iter}"
-            legacy_fold_tags = [
-                f"{tag}_SPDNet_{name}_{protocol_tag}_fold{kf_iter}"
-                for names in LEGACY_VARIANT_ALIASES.values()
-                for name in names
-            ]
             _harmonize_spd_for_fold(
                 X=X,
                 y=y,
@@ -444,15 +325,11 @@ def run_pooled_spdnet_ablation_benchmarks(
                 ts_metric=args.ts_metric,
                 save_dir=save_dir,
                 fold_tag=fold_tag,
-                legacy_fold_tags=legacy_fold_tags,
+                legacy_fold_tags=(),
                 cache_dirs=cache_dirs,
             )
-            cache_paths[kf_iter] = os.path.join(
-                save_dir,
-                f"{fold_tag}_harmonized_spd.npz",
-            )
-
-        return cache_paths
+            cache_tags[kf_iter] = fold_tag
+        return cache_tags
 
     def _get_variant_dims(P, variant_name):
         variant_name = canonical_spdnet_variant(variant_name)
@@ -473,13 +350,15 @@ def run_pooled_spdnet_ablation_benchmarks(
         X,
         y,
         subject_ids,
+        dataset_ids,
+        apply_harm_to_test,
         variant_name,
-        harmonized_cache_paths=None,
+        harmonized_cache_tags=None,
     ):
         output_variant_name = variant_name
         canonical_variant_name = canonical_spdnet_variant(variant_name)
         spd_dims = _get_variant_dims(args.P, canonical_variant_name)
-        harmonized_cache_paths = harmonized_cache_paths or {}
+        harmonized_cache_tags = harmonized_cache_tags or {}
 
         def _run_one(label):
             fold_metrics = init_fold_metrics(protocol_tag)
@@ -492,16 +371,21 @@ def run_pooled_spdnet_ablation_benchmarks(
             for kf_iter, (train_idx, test_idx) in enumerate(splits, start=1):
                 X_use = X
                 if label == "harm":
-                    if kf_iter not in harmonized_cache_paths:
+                    if kf_iter not in harmonized_cache_tags:
                         raise RuntimeError(
                             "Missing shared harmonized SPD cache for "
                             f"{protocol_tag} fold {kf_iter}."
                         )
-                    X_use = _load_harmonized_spd_cache(
+                    X_use = load_or_harmonize_spd_matrices(
                         X=X,
+                        y=y,
+                        dataset_ids=dataset_ids,
                         train_idx=train_idx,
                         test_idx=test_idx,
-                        cache_path=harmonized_cache_paths[kf_iter],
+                        apply_harm_to_test=apply_harm_to_test,
+                        ts_metric=args.ts_metric,
+                        save_dir=os.path.join(args.results_folder, "harmonized_spd"),
+                        fold_tag=harmonized_cache_tags[kf_iter],
                     )
 
                 metrics = train_spdnet_ablation_fold(
@@ -538,7 +422,7 @@ def run_pooled_spdnet_ablation_benchmarks(
 
     # Original behavior: keep DataLoader shuffling under the ambient run state,
     # without adding a fold-specific generator seed here.
-    rng = np.random.RandomState(rng_seed)
+    set_global_random_seed(args.seed)
 
     device = resolve_torch_device(args.no_cuda)
     print("Using device:", device)
@@ -566,7 +450,7 @@ def run_pooled_spdnet_ablation_benchmarks(
     assert X.shape[1] == X.shape[2], "X must be (N,P,P)"
 
     tag = "ALL-" + "-".join(list(pd.unique(dataset_ids))) if not args.no_make_tag else "ALL"
-    timestamp = time.strftime("[%Y-%m-%d %H:%M:%S]", time.localtime())
+    timestamp = f"[{timestamp_tag()}]"
 
     protocol_choice = args.protocol.lower()
     if args.cache_only and args.harm_mode == "none":
@@ -591,7 +475,7 @@ def run_pooled_spdnet_ablation_benchmarks(
             X,
             y,
             dataset_ids,
-            apply_harm_to_test=True,
+            apply_harm_to_test=harmonization_policy("kfold").apply_to_test,
         )
         if not args.cache_only:
             for variant_name in args.spdnet_variants:
@@ -602,8 +486,10 @@ def run_pooled_spdnet_ablation_benchmarks(
                     X,
                     y,
                     subject_ids,
+                    dataset_ids,
+                    harmonization_policy("kfold").apply_to_test,
                     variant_name=variant_name,
-                    harmonized_cache_paths=harmonized_cache_gkf,
+                    harmonized_cache_tags=harmonized_cache_gkf,
                 )
 
     if protocol_choice in ("lodo", "both"):
@@ -616,7 +502,7 @@ def run_pooled_spdnet_ablation_benchmarks(
             X,
             y,
             dataset_ids,
-            apply_harm_to_test=False,
+            apply_harm_to_test=harmonization_policy("lodo").apply_to_test,
         )
         if not args.cache_only:
             for variant_name in args.spdnet_variants:
@@ -627,8 +513,10 @@ def run_pooled_spdnet_ablation_benchmarks(
                     X,
                     y,
                     subject_ids,
+                    dataset_ids,
+                    harmonization_policy("lodo").apply_to_test,
                     variant_name=variant_name,
-                    harmonized_cache_paths=harmonized_cache_lodo,
+                    harmonized_cache_tags=harmonized_cache_lodo,
                 )
 
     if args.cache_only:
@@ -667,7 +555,10 @@ def args_parser(argv=None):
         "--harmonized_spd_cache_dirs",
         nargs="*",
         default=[],
-        help="Extra directories to search for reusable harmonized SPD .npz caches.",
+        help=(
+            "Deprecated compatibility option. External/legacy caches are not "
+            "reused because they lack the release cache signature."
+        ),
     )
 
     add_spdnet_head_args(parser)

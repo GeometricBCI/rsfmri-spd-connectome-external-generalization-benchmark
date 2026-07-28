@@ -7,6 +7,8 @@ then optionally apply the learned harmonization to the held-out split.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 
 import numpy as np
@@ -14,6 +16,36 @@ import pandas as pd
 from neuroHarmonize import harmonizationApply, harmonizationLearn
 from pyriemann.tangentspace import TangentSpace
 from sklearn.base import BaseEstimator, TransformerMixin
+
+CACHE_SCHEMA_VERSION = 2
+
+
+def _update_array_digest(hasher, value) -> None:
+    array = np.asarray(value)
+    hasher.update(str(array.shape).encode("utf-8"))
+    hasher.update(str(array.dtype).encode("utf-8"))
+    if array.dtype.kind in {"O", "U", "S"}:
+        payload = json.dumps(
+            array.astype(str).tolist(),
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+        hasher.update(payload)
+    else:
+        contiguous = np.ascontiguousarray(array)
+        hasher.update(memoryview(contiguous).cast("B"))
+
+
+def cache_input_signature(*arrays, **metadata) -> str:
+    """Hash cache inputs without persisting scan-level covariates or paths."""
+    hasher = hashlib.sha256()
+    hasher.update(f"schema={CACHE_SCHEMA_VERSION}".encode("ascii"))
+    for array in arrays:
+        _update_array_digest(hasher, array)
+    hasher.update(
+        json.dumps(metadata, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    )
+    return hasher.hexdigest()
 
 
 class RIEHarmonizer(BaseEstimator, TransformerMixin):
@@ -110,6 +142,17 @@ def load_or_harmonize_features(
     save_dir = Path(save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
     save_path = save_dir / f"{fold_tag}_harmonized_features.npz"
+    input_signature = cache_input_signature(
+        Z_tr,
+        Z_te,
+        cov_train,
+        cov_test,
+        train_idx,
+        test_idx,
+        apply_harm_to_test=bool(apply_harm_to_test),
+        feature_kind=str(feature_kind),
+        feature_metric=str(feature_metric),
+    )
 
     if save_path.exists():
         try:
@@ -122,8 +165,8 @@ def load_or_harmonize_features(
                     "apply_harm_to_test",
                     "feature_kind",
                     "feature_metric",
-                    "cov_train",
-                    "cov_test",
+                    "cache_schema_version",
+                    "input_signature",
                 }
                 if required.issubset(cache.files):
                     cache_ok = (
@@ -134,8 +177,9 @@ def load_or_harmonize_features(
                         and str(cache["feature_metric"].item()) == str(feature_metric)
                         and np.array_equal(cache["train_idx"], train_idx)
                         and np.array_equal(cache["test_idx"], test_idx)
-                        and np.array_equal(cache["cov_train"], cov_train.astype(str))
-                        and np.array_equal(cache["cov_test"], cov_test.astype(str))
+                        and int(cache["cache_schema_version"].item())
+                        == CACHE_SCHEMA_VERSION
+                        and str(cache["input_signature"].item()) == input_signature
                     )
                     if cache_ok:
                         print("Loaded harmonized features:", save_path)
@@ -160,8 +204,8 @@ def load_or_harmonize_features(
         apply_harm_to_test=bool(apply_harm_to_test),
         feature_kind=str(feature_kind),
         feature_metric=str(feature_metric),
-        cov_train=cov_train.astype(str),
-        cov_test=cov_test.astype(str),
+        cache_schema_version=CACHE_SCHEMA_VERSION,
+        input_signature=input_signature,
     )
     print("Saved harmonized features:", save_path)
     return Z_tr_h, Z_te_h
@@ -182,11 +226,32 @@ def load_or_harmonize_spd_matrices(
     save_dir = Path(save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
     save_path = save_dir / f"{fold_tag}_harmonized_spd.npz"
+    input_signature = cache_input_signature(
+        X[train_idx],
+        X[test_idx],
+        y[train_idx],
+        y[test_idx],
+        dataset_ids[train_idx],
+        dataset_ids[test_idx],
+        train_idx,
+        test_idx,
+        apply_harm_to_test=bool(apply_harm_to_test),
+        ts_metric=str(ts_metric),
+    )
 
     if save_path.exists():
         try:
             with np.load(save_path, allow_pickle=False) as cache:
-                required = {"X_tr", "X_te", "train_idx", "test_idx"}
+                required = {
+                    "X_tr",
+                    "X_te",
+                    "train_idx",
+                    "test_idx",
+                    "apply_harm_to_test",
+                    "ts_metric",
+                    "cache_schema_version",
+                    "input_signature",
+                }
                 if required.issubset(cache.files):
                     X_tr_h = cache["X_tr"]
                     X_te_h = cache["X_te"]
@@ -195,14 +260,13 @@ def load_or_harmonize_spd_matrices(
                         and X_te_h.shape == X[test_idx].shape
                         and np.array_equal(cache["train_idx"], train_idx)
                         and np.array_equal(cache["test_idx"], test_idx)
+                        and bool(cache["apply_harm_to_test"].item())
+                        == bool(apply_harm_to_test)
+                        and str(cache["ts_metric"].item()) == str(ts_metric)
+                        and int(cache["cache_schema_version"].item())
+                        == CACHE_SCHEMA_VERSION
+                        and str(cache["input_signature"].item()) == input_signature
                     )
-                    if "apply_harm_to_test" in cache.files:
-                        cache_ok = (
-                            cache_ok
-                            and bool(cache["apply_harm_to_test"].item()) == bool(apply_harm_to_test)
-                        )
-                    if "ts_metric" in cache.files:
-                        cache_ok = cache_ok and str(cache["ts_metric"].item()) == str(ts_metric)
                     if cache_ok:
                         X_h = X.copy()
                         X_h[train_idx] = X_tr_h
@@ -248,6 +312,8 @@ def load_or_harmonize_spd_matrices(
         reference=ts.reference_,
         apply_harm_to_test=bool(apply_harm_to_test),
         ts_metric=str(ts_metric),
+        cache_schema_version=CACHE_SCHEMA_VERSION,
+        input_signature=input_signature,
     )
     print("Saved harmonized SPD matrices:", save_path)
     return X_h

@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rsfmri-spd-connectome-benchmark"
+version = "0.1.0"
+description = "External-generalization benchmark for SPD rs-fMRI connectome regression"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "BSD-3-Clause"
+dynamic = ["dependencies"]
+
+[project.scripts]
+rsfmri-spd-benchmark = "spd_connectome_benchmark.benchmark_cli:main"
+
+[tool.setuptools]
+py-modules = [
+  "make_results",
+  "prepare_fmri_datasets",
+  "run_benchmark",
+  "run_pooled_benchmark",
+  "run_single_dataset_benchmark",
+  "run_spdnet_ablation",
+]
+packages = [
+  "spd_connectome_benchmark",
+  "spd_connectome_benchmark.analysis_outputs",
+  "spd_connectome_benchmark.benchmark_tools",
+  "spd_connectome_benchmark.connectomes",
+  "spd_connectome_benchmark.models",
+  "tools",
+  "tools.zenodo",
+]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]

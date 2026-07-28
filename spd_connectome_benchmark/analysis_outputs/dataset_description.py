@@ -1,12 +1,13 @@
 """Generate dataset description tables used by Paper Figure 2 and Table 1."""
 
+from __future__ import annotations
+
 import argparse
 import json
 import pickle
 import re
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from spd_connectome_benchmark.config import DEFAULT_ATLAS_DIR, DEFAULT_RAW_DATA_DIR, DEFAULT_TABLES_DIR, PAPER_DATASETS
@@ -15,6 +16,10 @@ from spd_connectome_benchmark.config import DEFAULT_ATLAS_DIR, DEFAULT_RAW_DATA_
 # Paper §2.1/§2.2 and Table 1 introduce the six benchmark datasets.
 DATASETS = list(PAPER_DATASETS)
 DEFAULT_RAW_ABIDE_DIR = DEFAULT_RAW_DATA_DIR / "ABIDE_pcp"
+FORBIDDEN_IDENTIFIER_OUTPUTS = (
+    Path("support/scan_level_metadata.csv"),
+    Path("support/abide_excluded_after_fetch.csv"),
+)
 
 
 DATASET_CONTEXT = {
@@ -56,27 +61,6 @@ DATASET_CONTEXT = {
     },
 }
 
-ABIDE_EXCLUDED_COLUMNS = [
-    "SUB_ID",
-    "SITE_ID",
-    "FILE_ID",
-    "DX_GROUP",
-    "AGE_AT_SCAN",
-    "SEX",
-    "func_mean_fd",
-    "func_num_fd",
-    "func_perc_fd",
-    "qc_rater_1",
-    "qc_anat_rater_2",
-    "qc_func_rater_2",
-    "qc_anat_rater_3",
-    "qc_func_rater_3",
-    "SUB_IN_SMP",
-    "raw_n_timepoints",
-    "exclusion_stage",
-    "exclusion_note",
-]
-
 
 def _load_df(dataset: str, pkl_dir: Path) -> pd.DataFrame:
     with open(pkl_dir / f"{dataset}_X_y.pkl", "rb") as f:
@@ -86,16 +70,6 @@ def _load_df(dataset: str, pkl_dir: Path) -> pd.DataFrame:
 def _extract_abide_subject_id(path: Path) -> int | None:
     match = re.search(r"(\d{7})", path.name)
     return int(match.group(1)) if match else None
-
-
-def _safe_nifti_timepoints(path: Path) -> int | str:
-    try:
-        import nibabel as nib
-
-        shape = nib.load(str(path)).shape
-    except Exception:
-        return "unavailable"
-    return int(shape[3]) if len(shape) > 3 else "unavailable"
 
 
 def _missing_abide_cache_selection(processed_df: pd.DataFrame) -> pd.DataFrame:
@@ -111,10 +85,10 @@ def _missing_abide_cache_selection(processed_df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def _abide_functional_files(func_dir: Path) -> dict[int, Path]:
+def _abide_functional_subjects(func_dir: Path) -> set[int]:
     func_paths = sorted(func_dir.glob("*_func_preproc.nii.gz"))
     return {
-        subject_id: path
+        subject_id
         for path in func_paths
         for subject_id in [_extract_abide_subject_id(path)]
         if subject_id is not None
@@ -162,54 +136,30 @@ def _abide_selection_table(
     )
 
 
-def _abide_exclusion_table(
-    phenotypic: pd.DataFrame,
-    excluded_after_fetch: list[int],
-    func_by_subject: dict[int, Path],
-) -> pd.DataFrame:
-    excluded = phenotypic.loc[phenotypic["SUB_ID"].isin(excluded_after_fetch)].copy()
-    if excluded.empty:
-        return pd.DataFrame()
-
-    excluded["raw_n_timepoints"] = excluded["SUB_ID"].map(
-        lambda subject_id: _safe_nifti_timepoints(func_by_subject[int(subject_id)])
-    )
-    excluded["exclusion_stage"] = "after PCP functional/phenotype match, before final benchmark table"
-    excluded["exclusion_note"] = np.where(
-        excluded["raw_n_timepoints"].eq(78),
-        "OHSU scans have 78 raw volumes and are absent from the final processed time-series table.",
-        "Absent from the final processed time-series table; retained raw PCP QC fields are listed for audit.",
-    )
-    return excluded[ABIDE_EXCLUDED_COLUMNS].sort_values(["SITE_ID", "SUB_ID"])
-
-
 def _abide_sample_selection(
     processed_df: pd.DataFrame,
     raw_abide_dir: Path,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Reconstruct ABIDE counts available from the local PCP cache and final pkl."""
+) -> pd.DataFrame:
+    """Reconstruct aggregate ABIDE counts without exporting identifiers."""
     phenotypic_path = raw_abide_dir / "Phenotypic_V1_0b_preprocessed1.csv"
     func_dir = raw_abide_dir / "cpac" / "nofilt_noglobal"
     if not phenotypic_path.exists() or not func_dir.exists():
-        return _missing_abide_cache_selection(processed_df), pd.DataFrame()
+        return _missing_abide_cache_selection(processed_df)
 
     phenotypic = pd.read_csv(phenotypic_path)
-    func_by_subject = _abide_functional_files(func_dir)
+    functional_subjects = _abide_functional_subjects(func_dir)
     phenotypic_ids = _integer_id_set(phenotypic["SUB_ID"])
-    func_ids = set(func_by_subject)
-    matched_ids = phenotypic_ids & func_ids
+    matched_ids = phenotypic_ids & functional_subjects
     processed_ids = _integer_id_set(processed_df["SubjectID"])
     excluded_after_fetch = sorted(matched_ids - processed_ids)
 
-    selection = _abide_selection_table(
+    return _abide_selection_table(
         n_phenotypic_rows=len(phenotypic),
         phenotypic_ids=phenotypic_ids,
         matched_ids=matched_ids,
         processed_ids=processed_ids,
         excluded_after_fetch=excluded_after_fetch,
     )
-    excluded = _abide_exclusion_table(phenotypic, excluded_after_fetch, func_by_subject)
-    return selection, excluded
 
 
 def _age_stats(age: pd.Series) -> dict:
@@ -317,37 +267,6 @@ def _diagnosis_frame(dataset: str, df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _scan_level_metadata(
-    dataset: str,
-    df: pd.DataFrame,
-    age: pd.Series,
-    site_col: str | int,
-    timepoints: pd.Series,
-) -> pd.DataFrame:
-    site_value_col = site_col if isinstance(site_col, str) and site_col in df.columns else None
-    diag_value_col = (
-        "Group"
-        if dataset == "adni" and "Group" in df.columns
-        else ("Diagnosis" if "Diagnosis" in df.columns else None)
-    )
-    session = df["Session"].astype(str) if "Session" in df.columns else "single_session"
-    scan_index = df.get("Session", pd.Series(np.arange(len(df)), index=df.index)).astype(str)
-
-    return pd.DataFrame(
-        {
-            "dataset": dataset,
-            "subject_id": df["SubjectID"].astype(str),
-            "scan_id": df["SubjectID"].astype(str) + "_" + scan_index,
-            "session": session,
-            "age": age.astype(float),
-            "sex": df["Sex"].astype(str) if "Sex" in df.columns else "unavailable",
-            "diagnosis": df[diag_value_col].astype(str) if diag_value_col else "unavailable",
-            "site": df[site_value_col].astype(str) if site_value_col else "unavailable",
-            "n_timepoints": timepoints.astype(int),
-        }
-    )
-
-
 def _qc_motion_summary_row(dataset: str, timepoints: pd.Series) -> dict:
     return {
         "dataset": dataset,
@@ -377,7 +296,10 @@ def _dataset_context_row(dataset: str, n_sites: int | str, longitudinal_flag: bo
     }
 
 
-def _build_dataset_artifacts(dataset: str, df: pd.DataFrame) -> tuple[dict, pd.DataFrame, pd.DataFrame, dict, dict]:
+def _build_dataset_artifacts(
+    dataset: str,
+    df: pd.DataFrame,
+) -> tuple[dict, pd.DataFrame, dict, dict]:
     age = pd.to_numeric(df["Age"], errors="coerce")
     age_summary = _age_stats(age)
     sex_counts, sex_counts_json = _sex_counts(df)
@@ -406,7 +328,6 @@ def _build_dataset_artifacts(dataset: str, df: pd.DataFrame) -> tuple[dict, pd.D
     return (
         dataset_row,
         _diagnosis_frame(dataset, df),
-        _scan_level_metadata(dataset, df, age, site_col, timepoints),
         _qc_motion_summary_row(dataset, timepoints),
         _dataset_context_row(dataset, n_sites, longitudinal_flag),
     )
@@ -416,7 +337,6 @@ def _write_dataset_tables(
     out_dir: Path,
     dataset_rows: list[dict],
     diagnosis_rows: list[dict],
-    scan_level_frames: list[pd.DataFrame],
     qc_rows: list[dict],
     context_rows: list[dict],
 ) -> None:
@@ -427,7 +347,6 @@ def _write_dataset_tables(
         support_dir / "diagnosis_summary.csv",
         index=False,
     )
-    pd.concat(scan_level_frames, ignore_index=True).to_csv(support_dir / "scan_level_metadata.csv", index=False)
     pd.DataFrame(qc_rows).sort_values("dataset").to_csv(support_dir / "qc_motion_summary.csv", index=False)
     pd.DataFrame(context_rows).sort_values("dataset").to_csv(support_dir / "dataset_context.csv", index=False)
 
@@ -440,10 +359,25 @@ def _write_dataset_readme(out_dir: Path) -> None:
         "Acquisition parameters (TR, scan duration in seconds, spatial resolution) and scan-level motion metrics "
         "are not retained in the processed pkl tables and are therefore marked unavailable here.\n"
         "ABIDE sample accounting is additionally reconstructed from the local ABIDE PCP cache in "
-        "abide_sample_selection.csv; subjects present after PCP functional/phenotype matching but absent from "
-        "the final benchmark table are listed in abide_excluded_after_fetch.csv.\n"
+        "abide_sample_selection.csv as aggregate counts only. No participant or scan identifiers are exported.\n"
     )
     (out_dir / "support" / "README.txt").write_text(readme)
+
+
+def _reject_stale_identifier_outputs(out_dir: Path) -> None:
+    """Fail closed when a reused output tree contains legacy identifier tables."""
+    stale = [
+        relative_path.as_posix()
+        for relative_path in FORBIDDEN_IDENTIFIER_OUTPUTS
+        if (out_dir / relative_path).exists()
+    ]
+    if stale:
+        raise RuntimeError(
+            "Refusing to reuse an output directory containing legacy "
+            "participant-level tables: "
+            + ", ".join(stale)
+            + ". Move or securely remove them before generating aggregate tables."
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -464,33 +398,29 @@ def main(
     raw_abide_dir: Path = DEFAULT_RAW_ABIDE_DIR,
     out_dir: Path = DEFAULT_TABLES_DIR,
 ) -> None:
+    _reject_stale_identifier_outputs(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     dataset_rows = []
     diagnosis_rows = []
-    scan_level_frames = []
     qc_rows = []
     context_rows = []
     abide_sample_selection = None
-    abide_excluded_after_fetch = None
 
     for dataset in DATASETS:
         df = _load_df(dataset, pkl_dir).copy()
         if dataset == "abide":
-            abide_sample_selection, abide_excluded_after_fetch = _abide_sample_selection(df, raw_abide_dir)
+            abide_sample_selection = _abide_sample_selection(df, raw_abide_dir)
 
-        dataset_row, diagnosis_frame, scan_meta, qc_row, context_row = _build_dataset_artifacts(dataset, df)
+        dataset_row, diagnosis_frame, qc_row, context_row = _build_dataset_artifacts(dataset, df)
         dataset_rows.append(dataset_row)
         diagnosis_rows.extend(diagnosis_frame.to_dict("records"))
-        scan_level_frames.append(scan_meta)
         qc_rows.append(qc_row)
         context_rows.append(context_row)
 
-    _write_dataset_tables(out_dir, dataset_rows, diagnosis_rows, scan_level_frames, qc_rows, context_rows)
+    _write_dataset_tables(out_dir, dataset_rows, diagnosis_rows, qc_rows, context_rows)
     if abide_sample_selection is not None:
         abide_sample_selection.to_csv(out_dir / "support" / "abide_sample_selection.csv", index=False)
-    if abide_excluded_after_fetch is not None and not abide_excluded_after_fetch.empty:
-        abide_excluded_after_fetch.to_csv(out_dir / "support" / "abide_excluded_after_fetch.csv", index=False)
     _write_dataset_readme(out_dir)
 
 

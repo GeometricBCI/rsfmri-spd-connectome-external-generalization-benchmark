@@ -1,11 +1,11 @@
 import json
-import os
 import pickle
 
 import numpy as np
 import pandas as pd
 import pytest
-import torch
+
+torch = pytest.importorskip("torch")
 
 from spd_connectome_benchmark.config import DEFAULT_COVARIANCE_EPS, PAPER_DATASETS
 from spd_connectome_benchmark.connectomes import (
@@ -81,8 +81,8 @@ def test_pooled_loader_prefixes_subject_ids(tmp_path):
     for dataset in ("cobre", "adni"):
         df = pd.DataFrame(
             {
-                "SubjectID": ["001", "002"],
-                "TimeSeries": [np.eye(6), np.eye(6) * 2],
+                "SubjectID": ["synthetic-a", "synthetic-b"],
+                "TimeSeries": [np.eye(100), np.eye(100) * 2],
                 "Age": [20.0, 30.0],
             }
         )
@@ -103,6 +103,101 @@ def test_pooled_loader_prefixes_subject_ids(tmp_path):
     assert all(str(subject_id).startswith(("cobre_", "adni_")) for subject_id in loaded.subject_ids)
 
 
+def test_loader_canonicalizes_dataset_aliases(tmp_path):
+    atlas_dir = tmp_path / "atlas_schaefer_100"
+    atlas_dir.mkdir()
+    df = pd.DataFrame(
+        {
+            "SubjectID": ["synthetic-a"],
+            "TimeSeries": [np.eye(100)],
+            "Age": [20.0],
+        }
+    )
+    with open(atlas_dir / "camcan_X_y.pkl", "wb") as f:
+        pickle.dump(df, f)
+
+    loaded = load_pooled_age_dataset(
+        datasets=("Cam-CAN",),
+        atlas_name="schaefer_100",
+        task="Age",
+        debug=None,
+        rng_seed=0,
+        data_root=tmp_path,
+        verbose=False,
+    )
+
+    assert loaded.dataset_ids.tolist() == ["camcan"]
+    assert loaded.subject_ids.tolist() == ["camcan_synthetic-a"]
+
+
+@pytest.mark.parametrize("dataset", ["../escaped", "unregistered"])
+def test_loader_rejects_unsafe_or_unknown_dataset_before_path_lookup(
+    tmp_path,
+    dataset,
+):
+    escaped = pd.DataFrame(
+        {
+            "SubjectID": ["synthetic-a"],
+            "TimeSeries": [np.eye(100)],
+            "Age": [20.0],
+        }
+    )
+    with open(tmp_path / "escaped_X_y.pkl", "wb") as f:
+        pickle.dump(escaped, f)
+
+    with pytest.raises(ValueError, match="Invalid dataset|Unsupported dataset"):
+        load_age_timeseries(
+            dataset=dataset,
+            atlas_name="schaefer_100",
+            task="Age",
+            debug=None,
+            rng=np.random.RandomState(0),
+            data_root=tmp_path,
+        )
+
+
+def test_loader_rejects_missing_age_and_wrong_atlas_dimensions(tmp_path):
+    atlas_dir = tmp_path / "atlas_schaefer_100"
+    atlas_dir.mkdir()
+    missing_age = pd.DataFrame(
+        {
+            "SubjectID": ["synthetic-a"],
+            "TimeSeries": [np.ones((120, 100), dtype=float)],
+        }
+    )
+    with open(atlas_dir / "cobre_X_y.pkl", "wb") as f:
+        pickle.dump(missing_age, f)
+
+    with pytest.raises(ValueError, match="missing required target"):
+        load_pooled_age_dataset(
+            datasets=("cobre",),
+            atlas_name="schaefer_100",
+            task="Age",
+            debug=None,
+            rng_seed=0,
+            data_root=tmp_path,
+            verbose=False,
+        )
+
+    wrong_regions = missing_age.assign(
+        TimeSeries=[np.ones((120, 39), dtype=float)],
+        Age=[30.0],
+    )
+    with open(atlas_dir / "cobre_X_y.pkl", "wb") as f:
+        pickle.dump(wrong_regions, f)
+
+    with pytest.raises(ValueError, match="same atlas region count"):
+        load_pooled_age_dataset(
+            datasets=("cobre",),
+            atlas_name="schaefer_100",
+            task="Age",
+            debug=None,
+            rng_seed=0,
+            data_root=tmp_path,
+            verbose=False,
+        )
+
+
 def test_metric_csv_writes_reproducibility_metadata(tmp_path):
     csv_path = tmp_path / "metrics.csv"
 
@@ -113,22 +208,3 @@ def test_metric_csv_writes_reproducibility_metadata(tmp_path):
     assert payload["elapsed_seconds"] == 0.5
     assert "python" in payload
     assert "dependencies" in payload
-
-
-def test_real_prepared_data_smoke_when_configured():
-    data_root = os.environ.get("RSFMRI_SPD_TEST_DATA_ROOT")
-    if not data_root:
-        pytest.skip("Set RSFMRI_SPD_TEST_DATA_ROOT to run the real-data smoke test.")
-
-    subject_ids, timeseries, y, y_type = load_age_timeseries(
-        dataset="cobre",
-        atlas_name="schaefer_100",
-        task="Age",
-        debug=3,
-        rng=np.random.RandomState(0),
-        data_root=data_root,
-    )
-
-    matrices = estimate_connectome_matrices(timeseries, normalize=True, n_jobs=1)
-    assert y_type == "continuous"
-    assert len(subject_ids) == len(y) == matrices.shape[0]

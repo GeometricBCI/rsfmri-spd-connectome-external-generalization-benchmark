@@ -175,7 +175,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     _add_subcommand(
         subparsers,
         "dataset-description",
-        "Generate dataset description and scan metadata tables.",
+        "Generate aggregate dataset-description tables without scan identifiers.",
         _run_dataset_description,
     )
     _add_subcommand(
@@ -213,6 +213,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
+    dataset_description._reject_stale_identifier_outputs(args.table_dir)
     args.run(args)
 
 

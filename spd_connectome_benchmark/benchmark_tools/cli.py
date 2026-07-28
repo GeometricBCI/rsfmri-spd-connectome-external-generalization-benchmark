@@ -121,7 +121,8 @@ def add_data_root_arg(parser: argparse.ArgumentParser) -> None:
         default=str(DEFAULT_DATA_ROOT),
         help=(
             "Root containing atlas_<atlas_name>/*_X_y.pkl files. "
-            "Defaults to RSFMRI_SPD_DATA_ROOT or ./data."
+            "Defaults to RSFMRI_SPD_DATA_ROOT or the checkout sibling "
+            "../rsfmri_spd_data."
         ),
     )
 

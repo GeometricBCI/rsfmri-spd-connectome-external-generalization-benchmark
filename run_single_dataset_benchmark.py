@@ -37,9 +37,11 @@ from spd_connectome_benchmark.connectomes import (
     vectorize_correlation_matrices,
 )
 from spd_connectome_benchmark.models.spd import SPDNetRegressor
+from spd_connectome_benchmark.results import portable_result_reference
 from spd_connectome_benchmark.benchmark_tools.runtime import (
     EarlyStopping,
     MatrixRegressionDataset,
+    ensure_nonempty_training_batches,
     evaluate_regression_loss,
     load_age_timeseries,
     save_metrics_csv,
@@ -106,6 +108,11 @@ def run_spdnet_age_regression(args, X, y, subject_ids, splits, device, dataset_n
         X_tr, y_tr = X[tr_idx], y[tr_idx]
         X_va, y_va = X[va_idx], y[va_idx]
         X_te, y_te = X[test_idx], y[test_idx]
+        ensure_nonempty_training_batches(
+            len(X_tr),
+            args.train_batch_size,
+            drop_last=True,
+        )
 
         train_loader = DataLoader(
             MatrixRegressionDataset(
@@ -569,13 +576,14 @@ def args_parser(argv=None):
     return args
 
 
-def main():
-    args = args_parser()
+def main(argv=None) -> int:
+    args = args_parser(argv)
     configure_logging(args.log_level)
     print("Using device:", args.device)
 
     datasets = [d.strip() for d in args.datasets.split(",") if d.strip()]
     all_results = {}
+    had_failures = False
 
     for ds in datasets:
         try:
@@ -583,12 +591,25 @@ def main():
             all_results[ds] = res
         except Exception as e:
             print(f"[ERROR] Dataset {ds} failed: {e}")
-            all_results[ds] = {"error": str(e)}
+            all_results[ds] = {"error": type(e).__name__}
+            had_failures = True
 
     summary_rows = []
     for ds, res in all_results.items():
         row = {"Dataset": ds}
-        row.update(res)
+        row.update(
+            {
+                name: (
+                    value
+                    if name == "error"
+                    else portable_result_reference(
+                        value,
+                        output_root=args.results_folder_root,
+                    )
+                )
+                for name, value in res.items()
+            }
+        )
         summary_rows.append(row)
 
     summary_df = pd.DataFrame(summary_rows)
@@ -597,7 +618,8 @@ def main():
     summary_df.to_csv(summary_path, index=False)
     print("\nSaved summary path table:", summary_path)
     print(summary_df)
+    return 1 if had_failures else 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
