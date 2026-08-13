@@ -35,7 +35,7 @@ Inspect a complete run before loading any data:
 
 ```bash
 rsfmri-spd-benchmark \
-  --config configs/examples/synthetic_dry_run.yaml \
+  --config configs/examples/mini_run.yaml \
   --dry-run
 ```
 
@@ -82,7 +82,7 @@ python make_results.py --help
 ├── requirements.txt
 ├── configs/
 │   └── examples/
-│       └── synthetic_dry_run.yaml
+│       └── mini_run.yaml
 ├── docs/
 │   └── reproducibility.md
 ├── spd_connectome_benchmark/
@@ -94,7 +94,7 @@ python make_results.py --help
 
 This is intentionally kept small: the package code lives under
 [spd_connectome_benchmark](spd_connectome_benchmark), the example run config is in
-[configs/examples/synthetic_dry_run.yaml](configs/examples/synthetic_dry_run.yaml),
+[configs/examples/mini_run.yaml](configs/examples/mini_run.yaml),
 and the main write-up is in [docs/reproducibility.md](docs/reproducibility.md).
 
 ## Data and outputs
@@ -112,7 +112,7 @@ The benchmark reads a single YAML config file passed through `--config`.
 The example config is minimal and intentionally readable:
 
 ```bash
-rsfmri-spd-benchmark --config configs/examples/synthetic_dry_run.yaml --dry-run
+rsfmri-spd-benchmark --config configs/examples/mini_run.yaml --dry-run
 ```
 
 Configuration precedence is:
