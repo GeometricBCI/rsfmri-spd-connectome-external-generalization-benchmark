@@ -34,7 +34,7 @@ python -m pip install -e .
 Inspect a complete run before loading any data:
 
 ```bash
-python run_benchmark.py \
+rsfmri-spd-benchmark \
   --config configs/examples/synthetic_dry_run.yaml \
   --dry-run
 ```
@@ -52,7 +52,7 @@ A typical LODO Ridge run is:
 export PREPARED_DATA_ROOT="<prepared-data-directory-outside-this-checkout>"
 export BENCHMARK_RESULTS_ROOT="<benchmark-results-directory>"
 
-python run_benchmark.py \
+rsfmri-spd-benchmark \
   --task regression \
   --target Age \
   --model ridge \
@@ -65,158 +65,73 @@ python run_benchmark.py \
   --output-dir "$BENCHMARK_RESULTS_ROOT"
 ```
 
-Run `python run_benchmark.py --help` for the stable interface. The historical
-specialist entry points remain available for reproducing established
-experiments:
+Use the package CLI for the supported interface:
 
 ```bash
-python run_single_dataset_benchmark.py --help
-python run_pooled_benchmark.py --help
-python run_spdnet_ablation.py --help
+rsfmri-spd-benchmark --help
 python prepare_fmri_datasets.py --help
 python make_results.py --help
 ```
 
-## Data
-
-Participant data are deliberately kept out of Git. The tracked GitHub
-repository does not contain raw MRI, ROI time series, participant identifiers,
-phenotypic tables, or prepared benchmark pickle tables.
-
-Prepared inputs are expected outside the checkout:
+## Project layout
 
 ```text
-<input-root>/
-  atlas_schaefer_100/
-    abide_X_y.pkl
-    adni_X_y.pkl
-    oasis3_X_y.pkl
-    camcan_X_y.pkl
-    cobre_X_y.pkl
-    adnidod_X_y.pkl
+.
+├── README.md
+├── pyproject.toml
+├── requirements.txt
+├── configs/
+│   └── examples/
+│       └── synthetic_dry_run.yaml
+├── docs/
+│   └── reproducibility.md
+├── spd_connectome_benchmark/
+├── tests/
+├── results/
+├── tools/
+└── release_templates/
 ```
 
-Each pickle contains a trusted local pandas table with one scan or session per
-row. Pickle can execute code while loading, so use only files you created
-yourself or obtained from a source whose checksum and provenance you have
-verified.
+This is intentionally kept small: the package code lives under
+[spd_connectome_benchmark](spd_connectome_benchmark), the example run config is in
+[configs/examples/synthetic_dry_run.yaml](configs/examples/synthetic_dry_run.yaml),
+and the main write-up is in [docs/reproducibility.md](docs/reproducibility.md).
 
-Dataset access and redistribution terms are handled separately:
+## Data and outputs
 
-- ADNI, ADNI-DOD, and OASIS-3 participant-level materials remain restricted;
-- ABIDE, COBRE, and CamCAN derived connectomes may enter the separate Zenodo
-  release only through the dataset-specific policy, metadata allowlist,
-  source-binding, and privacy checks;
-- 1000BRAINS and any unregistered dataset are non-public by default.
+Participant data are not checked into Git. The benchmark expects prepared
+connectome tables outside the repository checkout. Those files should be kept in
+an external data directory and referenced through the config or CLI arguments.
 
-See [data availability](docs/data_availability.md) for the release boundary and
-[data schema](docs/data_schema.md) for the internal table and connectome
-contracts.
+The project writes output artifacts such as benchmark CSVs and model metadata to
+an output directory, typically under `results/`.
 
 ## Configuration
 
-Configuration values are resolved in this order:
+The benchmark reads a single YAML config file passed through `--config`.
+The example config is minimal and intentionally readable:
 
-1. command-line argument;
-2. YAML configuration;
-3. `RSFMRI_SPD_*` environment variable;
-4. documented local default.
+```bash
+rsfmri-spd-benchmark --config configs/examples/synthetic_dry_run.yaml --dry-run
+```
 
-Paths written in YAML are relative to the YAML file. Relative command-line and
-environment paths are interpreted from the current working directory.
+Configuration precedence is:
 
-By default, prepared data live in the checkout sibling
-`../rsfmri_spd_data/`, and benchmark outputs are written beneath the ignored
-`results/benchmark_csv/` directory. External input and output locations can be
-set explicitly. Inputs may never be placed inside the Git checkout; outputs
-inside the checkout must remain under `results/`.
+1. command-line option;
+2. YAML value;
+3. environment variable;
+4. built-in local default.
 
-The supported YAML schema and environment variables are documented in
-[configs/README.md](configs/README.md) and
-[the reproducibility guide](docs/reproducibility.md).
-
-## Scientific protocol
-
-The release keeps the established scientific behavior explicit:
-
-- rows represent scans or sessions, while split groups represent subjects;
-- pooled subject keys are prefixed by dataset to prevent cross-cohort
-  collisions;
-- outer K-fold, validation, and Ridge tuning are subject-grouped;
-- LODO holds out one complete dataset;
-- tangent references and ComBat models are fitted on outer-training data;
-- LODO harmonization is source-only and leaves the unseen dataset
-  untransformed;
-- connectomes use per-scan OAS covariance, symmetrization, regularization,
-  correlation normalization, and final SPD jitter;
-- legacy metric names and fold labels are retained for result compatibility.
-
-The historical grouped-K-fold harmonization protocol uses known test age as a
-biological covariate when applying the learned transform. It is therefore
-target-informed and should not be described as deployment-style, label-free
-evaluation. Changing that behavior would define a new experiment rather than a
-software-only refactor.
-
-More detail is available in the
-[reproducibility guide](docs/reproducibility.md) and
-[repository audit](docs/repository_audit.md).
-
-## Outputs
-
-Benchmark CSVs are written to the selected output directory. Each result has a
-path-redacted metadata sidecar, and the stable CLI writes a deterministic
-`run_config_<fingerprint>.json` describing the logical experiment and available
-Git revision.
-
-Harmonization caches and model checkpoints are working artifacts. They can
-contain scan-level derived information and are not part of the public release.
-Aggregate tables and figures can be generated with `make_results.py` after the
-underlying benchmark outputs have been reviewed.
-
-## GitHub and Zenodo
-
-GitHub and Zenodo serve different purposes:
-
-- GitHub contains evolving source code, tests, configuration examples, and
-  documentation;
-- Zenodo receives a frozen dataset archive built from explicitly approved
-  derived data and reviewed metadata.
-
-The local `zenodo_upload/` work area is ignored by Git. The release tools
-validate source bindings, metadata allowlists, privacy rules, matrix structure,
-manifests, and checksums before creating an upload archive. They do not publish
-a Zenodo record, reserve a DOI, or create a GitHub release.
-
-See [the Zenodo release guide](docs/zenodo_release.md) for the controlled export
-and packaging workflow.
-
-## Testing
-
-The public test suite uses synthetic or mock inputs only:
+## Usage
 
 ```bash
 python -m pip install -r requirements-dev.txt
 python -m compileall -q spd_connectome_benchmark tools *.py
-python -m pytest
-python run_benchmark.py --help
+rsfmri-spd-benchmark --help
 ```
 
-CI never downloads participant data, opens a real prepared pickle, contacts
-Zenodo, or runs a full scientific benchmark.
+## License
 
-## License and citation
-
-Repository source code is released under the
-[BSD 3-Clause License](LICENSE). Dataset-specific terms are documented
-separately and are not replaced by the software license.
-
-The final paper citation and Zenodo DOI will be added only after the relevant
-records exist; they are not inferred in advance.
-
-## Development assistance
-
-The codebase, test structure, release tooling, and documentation were organized
-and edited with assistance from OpenAI Codex. Scientific decisions, data-use
-permissions, interpretation of results, and final review remain the
-responsibility of the project authors. Codex is not an author, creator, rights
-holder, designated human reviewer, approver, or source of dataset permission.
+Repository source code is released under the [BSD 3-Clause License](LICENSE).
+Dataset-specific terms are handled separately and are not replaced by the
+software license.

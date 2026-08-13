@@ -18,10 +18,6 @@ rsfmri-spd-benchmark = "spd_connectome_benchmark.benchmark_cli:main"
 py-modules = [
   "make_results",
   "prepare_fmri_datasets",
-  "run_benchmark",
-  "run_pooled_benchmark",
-  "run_single_dataset_benchmark",
-  "run_spdnet_ablation",
 ]
 packages = [
   "spd_connectome_benchmark",

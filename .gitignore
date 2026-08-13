@@ -52,8 +52,10 @@ results_*/
 run_config_*.json
 **/[[]*.csv
 
-# Generated release staging owned by the packaging workflow.
+# Generated release staging, packaging tooling, and editorial templates owned by the workflow.
 zenodo_upload/
+release_templates/
+tools/
 
 # Credentials, local environment, and tokens.
 .env
