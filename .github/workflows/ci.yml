@@ -28,7 +28,6 @@ jobs:
       - name: Check installed environment and unified CLI
         run: |
           python -m pip check
-          python run_benchmark.py --help
           rsfmri-spd-benchmark --help
       - name: Build and smoke-test a non-editable wheel
         run: |
@@ -49,4 +48,4 @@ jobs:
           for dataset in cobre adnidod camcan abide oasis3 adni; do
             touch "${dry_root}/atlas_schaefer_100/${dataset}_X_y.pkl"
           done
-          python run_benchmark.py --dry-run --input-root "${dry_root}"
+          rsfmri-spd-benchmark --dry-run --input-root "${dry_root}"
