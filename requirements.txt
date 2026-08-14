@@ -1,7 +1,8 @@
 # Python 3.11 validation environment.
 # Pinned direct runtime, preparation, and plotting dependencies.
+# Keep NumPy below 2.0 because neuroHarmonize and pyriemann require a 1.x series.
 
-numpy==2.0.2
+numpy==1.26.4
 pandas==2.3.3
 scikit-learn==1.6.1
 scipy==1.13.1
